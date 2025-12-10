@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>aoBudgetAI - The Budget Tracker That Invests For You</title>
+    <style>
+        :root {
+            --primary: #2185D0;
+            --primary-dark: #1a6fb3;
+            --secondary: #21BA45;
+            --accent: #6435C9;
+            --warning: #F2711C;
+            --bg-dark: #0F0F0F;
+            --bg-light: #f9f9f9;
+            --bg-card: #1E1E1E;
+            --text: #FFFFFF;
+            --text-dark: #1a1a1a;
+            --border: #333333;
+            --highlight-blue: #4285F4;
+            --highlight-light: #64B5F6;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+        
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .highlight-card {
+            background: linear-gradient(135deg, #1a2a3a 0%, #2a3a4a 100%);
+            border: 1px solid var(--highlight-blue);
+            color: white;
+        }
+        
+        .highlight-card h3 {
+            color: var(--highlight-light);
+        }
+        
+        .highlight-card .feature-list li:before {
+            color: var(--highlight-blue);
+        }
+        
+        .btn {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+        }
+        
+        .btn:hover {
+            background: var(--primary-dark);
+        }
+        
+        .btn-success {
+            background: var(--secondary);
+        }
+        
+        .btn-premium {
+            background: gold;
+            color: black;
+            font-weight: bold;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .hero-section {
+            min-height: 700px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background: linear-gradient(135deg, #0f2f3f 0%, #1a202c 100%);
+            color: white;
+        }
+        
+        .section-light {
+            background: var(--bg-light);
+            color: var(--text-dark);
+        }
+        
+        .step-item {
+            text-align: center;
+            padding: 1.5rem;
+        }
+        
+        .step-icon {
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+        
+        .statistic {
+            text-align: center;
+            padding: 1rem;
+        }
+        
+        .statistic-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        .progress {
+            background: #333;
+            border-radius: 10px;
+            margin: 0.5rem 0;
+            height: 10px;
+        }
+        
+        .progress-bar {
+            background: var(--primary);
+            height: 100%;
+            border-radius: 10px;
+        }
+        
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .feature-list li {
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .feature-list li:before {
+            content: "✓";
+            color: var(--secondary);
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+        
+        .architecture-diagram {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            margin: 2rem 0;
+        }
+        
+        .process-flow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 2rem 0;
+        }
+        
+        .process-step {
+            text-align: center;
+            flex: 1;
+            padding: 1rem;
+        }
+        
+        .process-arrow {
+            font-size: 2rem;
+            color: var(--primary);
+        }
+        
+        /* Premium specific styles */
+        .premium-card {
+            background: linear-gradient(135deg, gold, #ffd700);
+            color: black;
+            border: none;
+        }
+        
+        .premium-feature {
+            background: rgba(255, 215, 0, 0.1);
+            border-left: 4px solid gold;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+        
+        .pricing-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        
+        .pricing-card.featured {
+            border: 2px solid gold;
+            transform: scale(1.05);
+        }
+        
+        .price {
+            font-size: 3rem;
+            font-weight: bold;
+            margin: 1rem 0;
+        }
+        
+        .price-featured {
+            color: gold;
+        }
+        
+        /* Navigation */
+        nav {
+            background: linear-gradient(135deg, #0f2f3f 0%, #1a202c 100%);
+            padding: 1rem;
+            color: white;
+        }
+        
+        nav .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1rem;
+        }
+        
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        
+        nav .nav-links {
+            display: flex;
+            gap: 1.5rem;
+        }
+        
+        nav .nav-links a {
+            font-size: 1rem;
+            font-weight: normal;
+        }
+        
+        nav .nav-links .premium-link {
+            color: gold;
+        }
+        
+        /* Footer */
+        footer {
+            background: #1a1a1a;
+            padding: 3rem 0;
+            margin-top: 3rem;
+            color: #888;
+        }
+        
+        footer .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+        
+        footer .footer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+        }
+        
+        footer h4 {
+            color: white;
+            margin-bottom: 1rem;
+        }
+        
+        footer ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        footer li {
+            margin-bottom: 0.5rem;
+        }
+        
+        footer a {
+            color: #888;
+            text-decoration: none;
+        }
+        
+        .footer-bottom {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid #333;
+        }
+        
+        .pro-feature-note {
+            background: rgba(100, 53, 201, 0.1);
+            border-left: 4px solid var(--accent);
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="container">
+            <a href="#home">aoBudgetAI</a>
+            <div class="nav-links">
+                <a href="#home">Home</a>
+                <a href="#budget-app">Budget App</a>
+                <a href="#features">Features</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#upgrade" class="premium-link">✨ Upgrade</a>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Hero Section -->
+    <div class="hero-section" id="home">
+        <div class="container">
+            <h1 style="font-size: 4em; font-weight: normal; margin-bottom: 0;">aoBudgetAI</h1>
+            <h2 style="font-size: 1.7em; font-weight: normal; margin-top: 0.5em; margin-bottom: 1.5em;">
+                The Web3 Budget Tracker That Invests For You
+            </h2>
+            <p style="color: rgba(255,255,255,0.8); font-size: 1.3em; margin-bottom: 2em; max-width: 800px; margin-left: auto; margin-right: auto;">
+                Track your income and expenses, then let your personal AI agent invest the surplus based on your financial health. 
+                Your agent is completely sovereign and owned by you - deposit or withdraw anytime.
+            </p>
+            <a href="#budget-app" class="btn" style="font-size: 1.2rem; padding: 1rem 2rem;">Start Budgeting</a>
+            <a href="#upgrade" class="btn btn-premium" style="font-size: 1.2rem; padding: 1rem 2rem; margin-left: 1rem;">✨ Go Premium</a>
+        </div>
+    </div>
+
+    <!-- Premium Features Highlight -->
+    <div class="container" style="padding: 4rem 0;">
+        <div class="premium-card">
+            <div style="text-align: center; padding: 2rem;">
+                <h2 style="margin-bottom: 1rem;">✨ Unlock Premium Features</h2>
+                <p style="font-size: 1.2em; margin-bottom: 2em;">Get AI-powered financial insights and ad-free experience</p>
+                <a href="#upgrade" class="btn" style="background: black; color: gold; font-size: 1.1rem;">Upgrade to Premium</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- How It Works Section -->
+    <div class="container" style="padding: 6rem 0;">
+        <h2 style="text-align: center; font-size: 2.5em; margin-bottom: 2em;">How aoBudgetAI Works</h2>
+        
+        <div class="architecture-diagram">
+            <h3 style="text-align: center; color: var(--text-dark);">Web3 Architecture Flow</h3>
+            <div class="process-flow">
+                <div class="process-step">
+                    <div style="font-size: 3rem;">📝</div>
+                    <h4>1. Budget App</h4>
+                    <p>Track transactions in the Budget App</p>
+                </div>
+                <div class="process-arrow">→</div>
+                <div class="process-step">
+                    <div style="font-size: 3rem;">🔒</div>
+                    <h4>2. Secure Data</h4>
+                    <p>Data stays within your control</p>
+                </div>
+                <div class="process-arrow">→</div>
+                <div class="process-step">
+                    <div style="font-size: 3rem;">🤖</div>
+                    <h4>3. AI Analysis</h4>
+                    <p>AI processes your budget data</p>
+                </div>
+                <div class="process-arrow">→</div>
+                <div class="process-step">
+                    <div style="font-size: 3rem;">💡</div>
+                    <h4>4. Insights</h4>
+                    <p>Get recommendations in Budget App</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h3>📊 Budget Tracking First</h3>
+                <p>All AI features are accessed through the Budget App. You need transaction data for the AI to analyze.</p>
+                <ul class="feature-list">
+                    <li>Start by tracking income and expenses</li>
+                    <li>AI needs data to provide insights</li>
+                    <li>All analysis happens within your secure environment</li>
+                    <li>No direct access to AI process - it's a background service</li>
+                </ul>
+            </div>
+            
+            <div class="card">
+                <h3>🔒 Secure Data Flow</h3>
+                <p>Your financial data never leaves your control. The AI process only receives what it needs to analyze.</p>
+                <ul class="feature-list">
+                    <li>Budget data stays in Budget Process</li>
+                    <li>AI only receives anonymized analysis data</li>
+                    <li>You control what data gets analyzed</li>
+                    <li>Complete privacy and security</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Budget Tracking Section -->
+    <div class="section-light" style="padding: 6rem 0;">
+        <div class="container">
+            <h2 style="text-align: center; font-size: 2.5em; margin-bottom: 2em;">Start With Budget Tracking</h2>
+            
+            <div class="grid">
+                <div class="highlight-card">
+                    <h3>💰 Income Tracking</h3>
+                    <p>Easily track all your income sources with automatic categorization.</p>
+                    <ul class="feature-list">
+                        <li>Multiple income streams support</li>
+                        <li>Automatic categorization</li>
+                        <li>Recurring income detection</li>
+                        <li>Income forecasting</li>
+                    </ul>
+                </div>
+                
+                <div class="highlight-card">
+                    <h3>🛒 Expense Tracking</h3>
+                    <p>Monitor your spending with detailed categorization.</p>
+                    <ul class="feature-list">
+                        <li>Smart expense categorization</li>
+                        <li>Spending limit alerts</li>
+                        <li>Recurring bill tracking</li>
+                        <li>Custom budget categories</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 3rem;">
+                <p style="font-size: 1.2em; max-width: 600px; margin: 0 auto;">
+                    <strong>Important:</strong> AI insights are only available after you've tracked some transactions. 
+                    The more data you provide, the better the AI can help you.
+                </p>
+                <a href="#budget-app" class="btn" style="margin-top: 1.5rem;">Start Tracking Now</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Features Section -->
+    <div class="container" style="padding: 6rem 0;">
+        <h2 style="text-align: center; font-size: 2.5em; margin-bottom: 2em;">AI Insights (Available in Budget App)</h2>
+        
+        <div class="premium-feature">
+            <h3>⭐ Premium Feature</h3>
+            <p>AI Financial Analysis is available exclusively for Premium users. Upgrade to unlock powerful insights.</p>
+        </div>
+        
+        <div class="grid">
+            <div class="card">
+                <h3>📈 Financial Health Score</h3>
+                <p>Based on your transaction data, the AI calculates your financial health:</p>
+                <ul class="feature-list">
+                    <li><strong>Income/Expense Ratio</strong> - How much you save</li>
+                    <li><strong>Spending Patterns</strong> - Where your money goes</li>
+                    <li><strong>Budget Adherence</strong> - How well you stick to budgets</li>
+                    <li><strong>Financial Stability</strong> - Your overall financial health</li>
+                </ul>
+                <p><em>Access this in the Budget App after tracking transactions</em></p>
+            </div>
+            
+            <div class="card">
+                <h3>💡 Smart Recommendations</h3>
+                <p>The AI provides personalized recommendations based on your data:</p>
+                <ul class="feature-list">
+                    <li>Savings opportunities</li>
+                    <li>Budget optimization tips</li>
+                    <li>Spending pattern insights</li>
+                    <li>Financial goal planning</li>
+                </ul>
+                <p><em>These appear in your Budget App dashboard</em></p>
+            </div>
+        </div>
+        
+        <!-- Future Pro Features -->
+        <div class="pro-feature-note">
+            <h3>🚀 Coming Soon: Pro Tier</h3>
+            <p>In the future, we plan to introduce a <strong>Pro Tier</strong> that will include:</p>
+            <ul class="feature-list">
+                <li>Advanced trading features based on your financial status</li>
+                <li>Automated investment strategies tailored to your risk profile</li>
+                <li>DeFi integration for yield generation</li>
+                <li>Portfolio management and rebalancing</li>
+            </ul>
+            <p><em>Stay tuned for our Web3 investment features that will help grow your wealth automatically!</em></p>
+        </div>
+    </div>
+
+    <!-- CTA Section -->
+    <div class="section-light" style="padding: 6rem 0; text-align: center;">
+        <div class="container">
+            <h2 style="font-size: 2.5em; margin-bottom: 1em;">Ready to Get Started?</h2>
+            <p style="font-size: 1.33em; max-width: 800px; margin: 0 auto 2em;">
+                Start with the Budget App to track your transactions. AI insights will automatically become available 
+                as you build your financial data. Your privacy and data security are our top priority.
+            </p>
+            
+            <a href="#budget-app" class="btn" style="font-size: 1.2rem; padding: 1rem 2rem;">Go to Budget App</a>
+            <a href="#upgrade" class="btn btn-premium" style="font-size: 1.2rem; padding: 1rem 2rem; margin-left: 1rem;">✨ Go Premium</a>
+            <p style="margin-top: 1em;"><small>Start with budget tracking - AI insights will follow</small></p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-grid">
+                <div>
+                    <h4>aoBudgetAI</h4>
+                    <ul>
+                        <li><a href="#home">About Us</a></li>
+                        <li><a href="#home">Contact</a></li>
+                        <li><a href="#home">Privacy Policy</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>Features</h4>
+                    <ul>
+                        <li><a href="#budget-app">Budget Tracking</a></li>
+                        <li><a href="#features">AI Insights</a></li>
+                        <li><a href="#features">Investment Management</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="#how-it-works">How It Works</a></li>
+                        <li><a href="#home">Tutorials</a></li>
+                        <li><a href="#home">Support</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>The Budget Tracker That Invests For You</h4>
+                    <p>aoBudgetAI combines comprehensive budget tracking with AI-powered investment management.</p>
+                    <a href="#budget-app" class="btn">Go to Budget App</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 aoBudgetAI. Decentralized Budgeting Intelligence.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

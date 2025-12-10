@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Transaction - aoBudgetAI (Freemium)</title>
+    <style>
+        :root {
+            --primary: #2185D0;
+            --primary-dark: #1a6fb3;
+            --secondary: #21BA45;
+            --danger: #DB2828;
+            --warning: #F2711C;
+            --bg-dark: #0F0F0F;
+            --bg-light: #f9f9f9;
+            --bg-card: #FFFFFF;
+            --text: #1a1a1a;
+            --text-light: #666666;
+            --border: #ddd;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-light);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+        
+        .card {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .btn {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            width: 100%;
+            text-align: center;
+            box-sizing: border-box;
+        }
+        
+        .btn:hover {
+            background: var(--primary-dark);
+        }
+        
+        .btn-income {
+            background: var(--secondary);
+        }
+        
+        .btn-income:hover {
+            background: #1a9e38;
+        }
+        
+        .btn-expense {
+            background: var(--danger);
+        }
+        
+        .btn-expense:hover {
+            background: #c21f1f;
+        }
+        
+        .btn-premium {
+            background: gold;
+            color: black;
+            font-weight: bold;
+        }
+        
+        .upgrade-banner {
+            background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .form-input, .form-select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(33, 133, 208, 0.2);
+        }
+        
+        .message {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+        
+        .message-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        
+        .message-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .message-error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .message-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .tips {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 6px;
+            margin-top: 2rem;
+        }
+        
+        .transaction-highlight {
+            background: linear-gradient(135deg, #d4edda, #f8f9fa);
+            border-left: 4px solid var(--secondary);
+            padding: 1rem;
+            margin: 1rem 0;
+            transition: all 0.3s ease;
+        }
+        
+        .transaction-highlight.expense-mode {
+            background: linear-gradient(135deg, #f8d7da, #f8f9fa);
+            border-left-color: var(--danger);
+        }
+        
+        .type-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .type-option {
+            padding: 1rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+        }
+        
+        .type-option:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .type-option.active {
+            border-color: var(--primary);
+            background: var(--bg-card);
+        }
+        
+        .type-option.income.active {
+            border-color: var(--secondary);
+            background: #e8f5e8;
+        }
+        
+        .type-option.expense.active {
+            border-color: var(--danger);
+            background: #f8d7da;
+        }
+        
+        .type-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        nav {
+            background: linear-gradient(135deg, #0f2f3f 0%, #1a202c 100%);
+            padding: 1rem;
+            color: white;
+        }
+        
+        nav .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1rem;
+        }
+        
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        
+        nav .nav-links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+        
+        nav .nav-links a {
+            font-size: 1rem;
+            font-weight: normal;
+        }
+        
+        nav .nav-links .premium-link {
+            color: gold;
+        }
+        
+        footer {
+            background: #1a1a1a;
+            padding: 2rem 0;
+            margin-top: 3rem;
+            color: #888;
+        }
+        
+        footer .container {
+            text-align: center;
+        }
+        
+        .ad-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #2d3748;
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            max-width: 300px;
+            display: none;
+        }
+        
+        .ad-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 0.5rem;
+        }
+        
+        .ad-close {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            margin-left: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation for Freemium Users -->
+    <nav>
+        <div class="container">
+            <a href="freemium.html">aoBudgetAI</a>
+            <div class="nav-links">
+                <span style="color: white;">Free</span>
+                <a href="freemium.html">Dashboard</a>
+                <a href="transactions.html">Transactions</a>
+                <a href="categories.html">Categories</a>
+                <a href="reports.html">Reports</a>
+                <a href="add-transaction.html" style="border-bottom: 2px solid white;">Add Transaction</a>
+                <a href="upgrade.html" class="premium-link">✨ Upgrade to Premium</a>
+                <a href="index.html">← Back to Home</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <!-- Upgrade Banner for Freemium Users -->
+        <div class="upgrade-banner">
+            <h3>✨ Upgrade to Premium</h3>
+            <p>Unlock AI-powered financial insights and remove ads!</p>
+            <a href="upgrade.html" class="btn btn-premium">Upgrade Now</a>
+        </div>
+
+        <div class="card">
+            <h1 style="text-align: center; margin-bottom: 2rem;">Add Transaction</h1>
+
+            <!-- Transaction Type Selector -->
+            <div class="type-selector">
+                <div class="type-option income active" data-type="income" onclick="selectTransactionType('income')">
+                    <div class="type-icon">💰</div>
+                    <h3 style="margin: 0; color: var(--secondary);">Income</h3>
+                    <p style="margin: 0.5rem 0 0 0; color: var(--text);">Money coming in</p>
+                </div>
+                <div class="type-option expense" data-type="expense" onclick="selectTransactionType('expense')">
+                    <div class="type-icon">💳</div>
+                    <h3 style="margin: 0; color: var(--danger);">Expense</h3>
+                    <p style="margin: 0.5rem 0 0 0; color: var(--text);">Money going out</p>
+                </div>
+            </div>
+
+            <!-- Transaction Highlight -->
+            <div id="transactionHighlight" class="transaction-highlight">
+                <h3 id="highlightTitle" style="color: var(--secondary); margin: 0;">💰 Track Your Earnings</h3>
+                <p id="highlightText" style="margin: 0.5rem 0 0 0;">Recording income helps you understand your cash flow and plan for future expenses.</p>
+                <p><strong>User Role: <span id="userRoleDisplay">Free</span></strong></p>
+            </div>
+
+            <!-- Wallet Connection Warning -->
+            <div class="message message-warning">
+                <h3>Wallet Integration Notice</h3>
+                <p>In a production environment, this would validate your Arweave wallet connection. For this demo, you can submit transactions directly.</p>
+            </div>
+
+            <!-- Success Message -->
+            <div id="successMessage" class="message message-success" style="display: none;">
+                <h3>Success!</h3>
+                <p id="successText">Your transaction has been added successfully.</p>
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMessage" class="message message-error" style="display: none;">
+                <h3>Error</h3>
+                <p id="errorText"></p>
+            </div>
+
+            <!-- Transaction Form -->
+            <form id="transactionForm">
+                <input type="hidden" id="transactionType" value="income">
+
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select id="categorySelect" class="form-select" required>
+                        <option value="">Select a category</option>
+                        <!-- Income Categories -->
+                        <option value="6" class="income-category">Salary</option>
+                        <option value="7" class="income-category">Freelance</option>
+                        <option value="8" class="income-category">Investments</option>
+                        <option value="9" class="income-category">Business</option>
+                        <option value="10" class="income-category">Dividends</option>
+                        <!-- Expense Categories -->
+                        <option value="1" class="expense-category">Housing</option>
+                        <option value="2" class="expense-category">Food</option>
+                        <option value="3" class="expense-category">Transportation</option>
+                        <option value="4" class="expense-category">Healthcare</option>
+                        <option value="5" class="expense-category">Entertainment</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <input type="text" id="descriptionInput" class="form-input" 
+                           placeholder="Enter a description for this transaction" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Date</label>
+                    <input type="date" id="dateInput" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Amount ($)</label>
+                    <input type="number" id="amountInput" class="form-input" 
+                           step="0.01" min="0.01" placeholder="0.00" required>
+                </div>
+
+                <div class="grid">
+                    <button type="submit" class="btn btn-income" id="submitBtn">
+                        💰 Add Income
+                    </button>
+                    <a href="freemium.html" class="btn" style="background: #6c757d; text-align: center;">
+                        ❌ Cancel
+                    </a>
+                </div>
+            </form>
+
+            <!-- Transaction Tips -->
+            <div class="tips">
+                <h3>💡 Smart Financial Tracking</h3>
+                <p>Recording both income and expenses gives you a complete picture of your financial health.</p>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                    <div style="background: #e8f5e8; padding: 1rem; border-radius: 4px;">
+                        <h4 style="color: var(--secondary); margin: 0 0 0.5rem 0;">Income Best Practices</h4>
+                        <ul style="margin: 0;">
+                            <li>Record income as soon as you receive it</li>
+                            <li>Use specific categories for different sources</li>
+                            <li>Note recurring vs one-time income</li>
+                        </ul>
+                    </div>
+                    <div style="background: #ffe6e6; padding: 1rem; border-radius: 4px;">
+                        <h4 style="color: var(--danger); margin: 0 0 0.5rem 0;">Expense Best Practices</h4>
+                        <ul style="margin: 0;">
+                            <li>Record expenses immediately after purchase</li>
+                            <li>Use specific categories for accurate reporting</li>
+                            <li>Review expenses weekly to spot trends</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ads for Freemium Users -->
+    <div id="adContainer" class="ad-container">
+        <div class="ad-header">
+            <strong>Advertisement</strong>
+            <button onclick="closeAd()" class="ad-close">✕</button>
+        </div>
+        <p style="margin: 0; font-size: 0.9rem;">Upgrade to Premium to remove ads and unlock AI features!</p>
+        <a href="upgrade.html" style="color: gold; text-decoration: none; font-size: 0.8rem;">Upgrade Now</a>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 aoBudgetAI. Budget Management.</p>
+        </div>
+    </footer>
+    
+    <script>
+        let currentTransactionType = 'income';
+        let adTimer;
+        
+        // Set default date to today
+        function setDefaultDate() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('dateInput').value = today;
+        }
+        
+        function selectTransactionType(type) {
+            currentTransactionType = type;
+            
+            // Update UI for selected type
+            document.querySelectorAll('.type-option').forEach(option => {
+                option.classList.remove('active');
+            });
+            document.querySelector(`.type-option.${type}`).classList.add('active');
+            
+            // Update form elements
+            document.getElementById('transactionType').value = type;
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const highlight = document.getElementById('transactionHighlight');
+            const highlightTitle = document.getElementById('highlightTitle');
+            const highlightText = document.getElementById('highlightText');
+            
+            if (type === 'income') {
+                submitBtn.textContent = '💰 Add Income';
+                submitBtn.className = 'btn btn-income';
+                highlight.className = 'transaction-highlight';
+                highlightTitle.textContent = '💰 Track Your Earnings';
+                highlightTitle.style.color = 'var(--secondary)';
+                highlightText.textContent = 'Recording income helps you understand your cash flow and plan for future expenses.';
+            } else {
+                submitBtn.textContent = '💳 Add Expense';
+                submitBtn.className = 'btn btn-expense';
+                highlight.className = 'transaction-highlight expense-mode';
+                highlightTitle.textContent = '💳 Track Your Spending';
+                highlightTitle.style.color = 'var(--danger)';
+                highlightText.textContent = 'Recording expenses helps you understand where your money is going and identify savings opportunities.';
+            }
+            
+            // Update category options visibility
+            updateCategoryOptions(type);
+            
+            // Update placeholder text
+            const descriptionInput = document.getElementById('descriptionInput');
+            if (type === 'income') {
+                descriptionInput.placeholder = 'e.g., Monthly salary, Freelance project, Investment returns...';
+            } else {
+                descriptionInput.placeholder = 'e.g., Groceries, Rent payment, Gas refill, Dinner out...';
+            }
+        }
+        
+        function updateCategoryOptions(type) {
+            const categorySelect = document.getElementById('categorySelect');
+            const options = categorySelect.getElementsByTagName('option');
+            
+            // Reset all options
+            for (let i = 0; i < options.length; i++) {
+                options[i].style.display = '';
+            }
+            
+            // Hide options that don't match the selected type
+            for (let i = 0; i < options.length; i++) {
+                if (options[i].value && 
+                    ((type === 'income' && options[i].classList.contains('expense-category')) ||
+                     (type === 'expense' && options[i].classList.contains('income-category')))) {
+                    options[i].style.display = 'none';
+                }
+            }
+            
+            // Reset selection if current selection doesn't match type
+            const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+            if (selectedOption.value && 
+                ((type === 'income' && selectedOption.classList.contains('expense-category')) ||
+                 (type === 'expense' && selectedOption.classList.contains('income-category')))) {
+                categorySelect.selectedIndex = 0;
+            }
+        }
+        
+        function showSuccess(message) {
+            document.getElementById('successText').textContent = message;
+            document.getElementById('successMessage').style.display = 'block';
+            setTimeout(() => {
+                document.getElementById('successMessage').style.display = 'none';
+            }, 3000);
+        }
+        
+        function showError(message) {
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('errorMessage').style.display = 'block';
+        }
+        
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+        
+        // Form submission handler
+        document.getElementById('transactionForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const type = document.getElementById('transactionType').value;
+            const category = document.getElementById('categorySelect').value;
+            const description = document.getElementById('descriptionInput').value;
+            const date = document.getElementById('dateInput').value;
+            const amount = document.getElementById('amountInput').value;
+            
+            // Validation
+            if (!category || !description || !date || !amount || parseFloat(amount) <= 0) {
+                showError('Please fill in all fields with valid values');
+                return;
+            }
+            
+            // Submit the transaction
+            submitTransaction({
+                type: type,
+                category: category,
+                description: description,
+                date: date,
+                amount: parseFloat(amount)
+            });
+        });
+        
+        function submitTransaction(transactionData) {
+            // Show loading state
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.innerHTML = '⏳ Adding Transaction...';
+            submitBtn.disabled = true;
+            
+            // Simulate API call
+            setTimeout(() => {
+                // In real app, this would call an AO process handler
+                addTransactionToStorage(transactionData);
+                
+                // Show success
+                const successMessage = transactionData.type === 'income' 
+                    ? `Successfully recorded income of $${transactionData.amount.toFixed(2)}`
+                    : `Successfully recorded expense of $${transactionData.amount.toFixed(2)}`;
+                showSuccess(successMessage);
+                
+                // Reset form
+                document.getElementById('transactionForm').reset();
+                setDefaultDate();
+                
+                // Reset button
+                submitBtn.innerHTML = transactionData.type === 'income' ? '💰 Add Income' : '💳 Add Expense';
+                submitBtn.disabled = false;
+                
+            }, 1000);
+        }
+        
+        function addTransactionToStorage(transactionData) {
+            // This would be handled by AO process in production
+            console.log('Transaction added:', transactionData);
+            
+            // For demo purposes, show a confirmation in console
+            const amount = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(transactionData.amount);
+            
+            console.log(`Successfully recorded ${transactionData.type} of ${amount} for ${transactionData.description}`);
+        }
+        
+        // Ad Functions
+        function showAd() {
+            const adContainer = document.getElementById('adContainer');
+            if (adContainer) {
+                adContainer.style.display = 'block';
+                setTimeout(() => {
+                    adContainer.style.display = 'none';
+                }, 10000);
+            }
+        }
+        
+        function closeAd() {
+            const adContainer = document.getElementById('adContainer');
+            if (adContainer) {
+                adContainer.style.display = 'none';
+            }
+        }
+        
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            setDefaultDate();
+            updateCategoryOptions(currentTransactionType);
+            
+            // Add some helpful auto-fill examples
+            document.getElementById('descriptionInput').addEventListener('focus', function() {
+                if (!this.value) {
+                    if (currentTransactionType === 'income') {
+                        this.placeholder = 'e.g., Monthly salary, Freelance project, Investment returns...';
+                    } else {
+                        this.placeholder = 'e.g., Groceries, Rent payment, Gas refill, Dinner out...';
+                    }
+                }
+            });
+            
+            document.getElementById('descriptionInput').addEventListener('blur', function() {
+                this.placeholder = 'Enter a description for this transaction';
+            });
+            
+            // Show ad every minute (60000 ms)
+            adTimer = setInterval(showAd, 60000);
+            setTimeout(showAd, 5000);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Category - aoBudgetAI (Freemium)</title>
+    <style>
+        :root {
+            --primary: #2185D0;
+            --primary-dark: #1a6fb3;
+            --secondary: #21BA45;
+            --danger: #DB2828;
+            --warning: #F2711C;
+            --bg-dark: #0F0F0F;
+            --bg-light: #f9f9f9;
+            --bg-card: #FFFFFF;
+            --text: #1a1a1a;
+            --text-light: #666666;
+            --border: #ddd;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-light);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+        
+        .card {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .btn {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        
+        .btn:hover {
+            background: var(--primary-dark);
+        }
+        
+        .btn-success {
+            background: var(--secondary);
+        }
+        
+        .btn-premium {
+            background: gold;
+            color: black;
+            font-weight: bold;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .message {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .message-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        
+        .message-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .message-error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .message-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(33, 133, 208, 0.2);
+        }
+        
+        .form-select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 1rem;
+            background: white;
+            cursor: pointer;
+        }
+        
+        .icon-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        .icon-option {
+            padding: 0.75rem;
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1.5rem;
+        }
+        
+        .icon-option:hover {
+            border-color: var(--primary);
+            background: #f8f9fa;
+        }
+        
+        .icon-option.selected {
+            border-color: var(--primary);
+            background: #e3f2fd;
+        }
+        
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        
+        .info-section {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 6px;
+            margin-top: 2rem;
+        }
+        
+        .type-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-right: 0.5rem;
+        }
+        
+        .type-income {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .type-expense {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .premium-category-tip {
+            background: linear-gradient(135deg, gold, #fff9e6);
+            border-left: 4px solid gold;
+            padding: 1rem;
+            margin: 1rem 0;
+            color: black;
+        }
+        
+        .upgrade-banner {
+            background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        nav {
+            background: linear-gradient(135deg, #0f2f3f 0%, #1a202c 100%);
+            padding: 1rem;
+            color: white;
+        }
+        
+        nav .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1rem;
+        }
+        
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        
+        nav .nav-links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+        
+        nav .nav-links a {
+            font-size: 1rem;
+            font-weight: normal;
+        }
+        
+        nav .nav-links .premium-link {
+            color: gold;
+        }
+        
+        footer {
+            background: #1a1a1a;
+            padding: 2rem 0;
+            margin-top: 3rem;
+            color: #888;
+        }
+        
+        footer .container {
+            text-align: center;
+        }
+        
+        .ad-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #2d3748;
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            max-width: 300px;
+            display: none;
+        }
+        
+        .ad-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 0.5rem;
+        }
+        
+        .ad-close {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            margin-left: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation for Freemium Users -->
+    <nav>
+        <div class="container">
+            <a href="freemium.html">aoBudgetAI</a>
+            <div class="nav-links">
+                <span style="color: white;">Free</span>
+                <a href="freemium.html">Dashboard</a>
+                <a href="transactions.html">Transactions</a>
+                <a href="categories.html" style="border-bottom: 2px solid white;">Categories</a>
+                <a href="reports.html">Reports</a>
+                <a href="add-income.html">Add Income</a>
+                <a href="add-expense.html">Add Expense</a>
+                <a href="upgrade.html" class="premium-link">✨ Upgrade to Premium</a>
+                <a href="index.html">← Back to Home</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <!-- Upgrade Banner for Freemium Users -->
+        <div class="upgrade-banner">
+            <h3>✨ Upgrade to Premium</h3>
+            <p>Unlock AI-powered financial insights and remove ads!</p>
+            <a href="upgrade.html" class="btn btn-premium">Upgrade Now</a>
+        </div>
+
+        <div class="card">
+            <h1>Create Category</h1>
+            <p style="color: var(--text-light); margin-bottom: 2rem;">
+                Categories are used to group your transactions and track spending patterns.
+            </p>
+
+            <!-- No AI Category Tip for Freemium Users -->
+
+            <!-- Wallet Connection Notice -->
+            <div class="message message-warning">
+                <h3>Wallet Integration Notice</h3>
+                <p>In a production environment, this would connect to your Arweave wallet. For this demo, categories are stored locally.</p>
+                <p><strong>User Role: <span id="userRoleDisplay">Free</span></strong></p>
+            </div>
+
+            <!-- Success Message -->
+            <div id="successMessage" class="message message-success" style="display: none;">
+                <h3>Success!</h3>
+                <p>Your category has been created successfully.</p>
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMessage" class="message message-error" style="display: none;">
+                <h3>Error</h3>
+                <p id="errorText"></p>
+            </div>
+
+            <form id="categoryForm">
+                <!-- Name Field -->
+                <div class="form-group">
+                    <label class="form-label" for="name">Category Name *</label>
+                    <input 
+                        type="text" 
+                        id="name" 
+                        class="form-input" 
+                        placeholder="e.g., Groceries, Salary, Rent"
+                        required
+                    >
+                    <small style="color: var(--text-light);">Give your category a clear, descriptive name</small>
+                </div>
+
+                <!-- Type Field -->
+                <div class="form-group">
+                    <label class="form-label" for="type">Category Type *</label>
+                    <select id="type" class="form-select" required>
+                        <option value="">Select a type</option>
+                        <option value="income">💰 Income - Money coming in</option>
+                        <option value="expense">💳 Expense - Money going out</option>
+                    </select>
+                </div>
+
+                <!-- Icon Selection -->
+                <div class="form-group">
+                    <label class="form-label">Select an Icon *</label>
+                    <div class="icon-grid" id="iconGrid">
+                        <div class="icon-option" data-value="💰" data-name="money">💰</div>
+                        <div class="icon-option" data-value="🍕" data-name="food">🍕</div>
+                        <div class="icon-option" data-value="🏠" data-name="home">🏠</div>
+                        <div class="icon-option" data-value="🚗" data-name="car">🚗</div>
+                        <div class="icon-option" data-value="🛒" data-name="shopping">🛒</div>
+                        <div class="icon-option" data-value="❤️" data-name="health">❤️</div>
+                        <div class="icon-option" data-value="💻" data-name="tech">💻</div>
+                        <div class="icon-option" data-value="📱" data-name="phone">📱</div>
+                        <div class="icon-option" data-value="🎮" data-name="games">🎮</div>
+                        <div class="icon-option" data-value="📚" data-name="books">📚</div>
+                        <div class="icon-option" data-value="🎁" data-name="gifts">🎁</div>
+                        <div class="icon-option" data-value="✈️" data-name="travel">✈️</div>
+                        <div class="icon-option" data-value="🎓" data-name="education">🎓</div>
+                        <div class="icon-option" data-value="🏥" data-name="medical">🏥</div>
+                        <div class="icon-option" data-value="💡" data-name="utilities">💡</div>
+                        <div class="icon-option" data-value="👕" data-name="clothing">👕</div>
+                        <div class="icon-option" data-value="🍽️" data-name="dining">🍽️</div>
+                        <div class="icon-option" data-value="🏋️" data-name="fitness">🏋️</div>
+                        <div class="icon-option" data-value="🎭" data-name="entertainment">🎭</div>
+                        <div class="icon-option" data-value="📈" data-name="investments">📈</div>
+                    </div>
+                    <input type="hidden" id="icon" name="icon" required>
+                    <small style="color: var(--text-light);">Click to select an icon that represents your category</small>
+                </div>
+
+                <!-- Description Field -->
+                <div class="form-group">
+                    <label class="form-label" for="description">Description</label>
+                    <input 
+                        type="text" 
+                        id="description" 
+                        class="form-input" 
+                        placeholder="It will help with AI analysis (premium feature)"
+                    >
+                    <small style="color: var(--text-light);">A brief description of what this category includes</small>
+                </div>
+
+                <!-- Submit Buttons -->
+                <div class="button-group">
+                    <button type="submit" class="btn btn-success" id="submitBtn">
+                        💾 Create Category
+                    </button>
+                    <a href="categories.html" class="btn btn-secondary" style="text-align: center;">
+                        ❌ Cancel
+                    </a>
+                    <button onclick="checkUserRole()" class="btn" style="background: var(--warning); grid-column: span 2;">
+                        👤 Check Role
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Information Section -->
+        <div class="info-section">
+            <h3>Why categorize transactions?</h3>
+            <p>Categorizing your transactions helps you understand where your money is going, identify spending patterns, and create better budgets. You can assign each transaction to a category to track expenses and income more effectively.</p>
+            
+            <div style="margin-top: 1.5rem;">
+                <h4>Expense Categories</h4>
+                <p>Expense categories represent money going out, such as <span class="type-badge type-expense">Groceries</span> <span class="type-badge type-expense">Rent</span> <span class="type-badge type-expense">Utilities</span> <span class="type-badge type-expense">Entertainment</span> and <span class="type-badge type-expense">Transportation</span>.</p>
+                
+                <h4>Income Categories</h4>
+                <p>Income categories represent money coming in, such as <span class="type-badge type-income">Salary</span> <span class="type-badge type-income">Freelance</span> <span class="type-badge type-income">Investments</span> and <span class="type-badge type-income">Gifts</span>.</p>
+            </div>
+            
+            <div style="margin-top: 1.5rem; padding: 1rem; background: white; border-radius: 4px;">
+                <h4>💡 Pro Tip</h4>
+                <p>Create specific categories that match your spending habits. The more accurate your categories, the better the AI can analyze your financial patterns and provide useful insights.</p>
+                <p><strong>Upgrade to Premium</strong> to unlock AI-powered category suggestions based on your spending patterns!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ads for Freemium Users -->
+    <div id="adContainer" class="ad-container">
+        <div class="ad-header">
+            <strong>Advertisement</strong>
+            <button onclick="closeAd()" class="ad-close">✕</button>
+        </div>
+        <p style="margin: 0; font-size: 0.9rem;">Upgrade to Premium to remove ads and unlock AI features!</p>
+        <a href="upgrade.html" style="color: gold; text-decoration: none; font-size: 0.8rem;">Upgrade Now</a>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 aoBudgetAI. Budget Management.</p>
+        </div>
+    </footer>
+    
+    <script>
+        let selectedIcon = '';
+        let userRole = 'freemium';
+        let adTimer;
+        
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            checkUserRole();
+        });
+        
+        function checkUserRole() {
+            // For freemium, we always show the upgrade banner
+            updateRoleUI('freemium');
+        }
+        
+        function updateRoleUI(role) {
+            // For freemium, we don't need to change much
+            setupForm();
+        }
+        
+        function setupForm() {
+            // Set up icon selection
+            const iconOptions = document.querySelectorAll('.icon-option');
+            iconOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    // Remove selected class from all options
+                    iconOptions.forEach(opt => opt.classList.remove('selected'));
+                    
+                    // Add selected class to clicked option
+                    this.classList.add('selected');
+                    
+                    // Set the hidden input value
+                    selectedIcon = this.getAttribute('data-value');
+                    document.getElementById('icon').value = selectedIcon;
+                });
+            });
+            
+            // Select first icon by default
+            if (iconOptions.length > 0) {
+                iconOptions[0].click();
+            }
+            
+            // Handle form submission
+            document.getElementById('categoryForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                createCategory();
+            });
+        }
+        
+        function createCategory() {
+            const name = document.getElementById('name').value.trim();
+            const type = document.getElementById('type').value;
+            const icon = document.getElementById('icon').value;
+            const description = document.getElementById('description').value.trim();
+            
+            // Validation
+            if (!name) {
+                showError('Please enter a category name');
+                return;
+            }
+            
+            if (!type) {
+                showError('Please select a category type');
+                return;
+            }
+            
+            if (!icon) {
+                showError('Please select an icon');
+                return;
+            }
+            
+            // Show loading state
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.innerHTML = '⏳ Creating...';
+            submitBtn.disabled = true;
+            
+            // Simulate API call (in real app, this would call AO process)
+            setTimeout(() => {
+                const categoryData = {
+                    name: name,
+                    type: type,
+                    icon: icon,
+                    description: description || 'No description provided',
+                    transaction_count: 0
+                };
+                
+                // In a real app, this would send to AO process
+                console.log('Creating category:', categoryData);
+                
+                // Show success message
+                showSuccess();
+                
+                // Reset form after success
+                setTimeout(() => {
+                    document.getElementById('categoryForm').reset();
+                    document.querySelectorAll('.icon-option').forEach(opt => opt.classList.remove('selected'));
+                    if (document.querySelectorAll('.icon-option').length > 0) {
+                        document.querySelectorAll('.icon-option')[0].click();
+                    }
+                    submitBtn.innerHTML = '💾 Create Category';
+                    submitBtn.disabled = false;
+                }, 2000);
+                
+            }, 1000);
+        }
+        
+        function showSuccess() {
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('successMessage').style.display = 'block';
+            
+            // Redirect after 2 seconds
+            setTimeout(() => {
+                window.location.href = 'categories.html';
+            }, 2000);
+        }
+        
+        function showError(message) {
+            document.getElementById('successMessage').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'block';
+            document.getElementById('errorText').textContent = message;
+            
+            // Re-enable submit button
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.innerHTML = '💾 Create Category';
+            submitBtn.disabled = false;
+        }
+        
+        // Ad Functions
+        function showAd() {
+            const adContainer = document.getElementById('adContainer');
+            if (adContainer) {
+                adContainer.style.display = 'block';
+                setTimeout(() => {
+                    adContainer.style.display = 'none';
+                }, 10000);
+            }
+        }
+        
+        function closeAd() {
+            const adContainer = document.getElementById('adContainer');
+            if (adContainer) {
+                adContainer.style.display = 'none';
+            }
+        }
+        
+        // Show ad every minute (60000 ms)
+        adTimer = setInterval(showAd, 60000);
+        setTimeout(showAd, 5000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Subscriptions - aoBudgetAI (Pro)</title>
+    <style>
+        :root {
+            --primary: #2185D0;
+            --primary-dark: #1a6fb3;
+            --secondary: #21BA45;
+            --danger: #DB2828;
+            --warning: #F2711C;
+            --bg-dark: #0F0F0F;
+            --bg-light: #f9f9f9;
+            --bg-card: #FFFFFF;
+            --text: #1a1a1a;
+            --text-light: #666666;
+            --border: #ddd;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-light);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+        
+        .card {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .btn {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        
+        .btn:hover {
+            background: var(--primary-dark);
+        }
+        
+        .btn-success {
+            background: var(--secondary);
+        }
+        
+        .btn-premium {
+            background: gold;
+            color: black;
+            font-weight: bold;
+        }
+        
+        .btn-pro {
+            background: #8B5CF6;
+            color: white;
+        }
+        
+        .btn-disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .plan-card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+        
+        .plan-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        }
+        
+        .plan-card.current {
+            border-color: #8B5CF6;
+            background: linear-gradient(135deg, #f3f4f6, #ffffff);
+        }
+        
+        .plan-card.freemium {
+            border-color: #6B7280;
+            background: linear-gradient(135deg, #f8f9fa, #ffffff);
+        }
+        
+        .plan-card.premium {
+            border-color: gold;
+            background: linear-gradient(135deg, #fff9e6, #ffffff);
+        }
+        
+        .plan-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        
+        .badge-current {
+            background: #8B5CF6;
+            color: white;
+        }
+        
+        .badge-freemium {
+            background: #6B7280;
+            color: white;
+        }
+        
+        .badge-premium {
+            background: gold;
+            color: black;
+        }
+        
+        .badge-pro {
+            background: #8B5CF6;
+            color: white;
+        }
+        
+        .price {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 1rem 0;
+        }
+        
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 1.5rem 0;
+        }
+        
+        .feature-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .feature-list li::before {
+            content: "✓";
+            color: var(--secondary);
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+        
+        nav {
+            background: linear-gradient(135deg, #0f2f3f 0%, #1a202c 100%);
+            padding: 1rem;
+            color: white;
+        }
+        
+        nav .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1rem;
+        }
+        
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        
+        nav .nav-links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+        
+        nav .nav-links a {
+            font-size: 1rem;
+            font-weight: normal;
+        }
+        
+        footer {
+            background: #1a1a1a;
+            padding: 2rem 0;
+            margin-top: 3rem;
+            color: #888;
+        }
+        
+        footer .container {
+            text-align: center;
+        }
+        
+        .current-plan-banner {
+            background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+            border-left: 4px solid #8B5CF6;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        
+        .billing-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .account-manager {
+            background: linear-gradient(135deg, #e0f2fe, #f0f9ff);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            border: 1px solid #bae6fd;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation for Pro Users -->
+    <nav>
+        <div class="container">
+            <a href="pro.html">aoBudgetAI</a>
+            <div class="nav-links">
+                <span style="color: #8B5CF6;">🚀 Pro</span>
+                <a href="pro.html">Dashboard</a>
+                <a href="pro-subscriptions.html" style="border-bottom: 2px solid white;">Subscriptions</a>
+                <a href="pro-ai.html">🤖 AI Analysis</a>
+                <a href="index.html">Home</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <!-- Current Plan Info -->
+        <div class="current-plan-banner">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <h2 style="margin: 0; color: #6d28d9;">Your Current Plan: Professional</h2>
+                    <p style="margin: 0.5rem 0 0 0; color: var(--text-light);">
+                        <strong>Price:</strong> $15/month | 
+                        <strong>Next Billing:</strong> October 27, 2025 |
+                        <strong>Features:</strong> Advanced AI, Multi-wallet, Dedicated support
+                    </p>
+                </div>
+                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                    <button onclick="showBillingHistory()" class="btn" style="background: var(--warning);">
+                        📊 Billing History
+                    </button>
+                    <button onclick="contactAccountManager()" class="btn" style="background: var(--primary);">
+                        👤 Account Manager
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Manager Section -->
+        <div class="account-manager">
+            <h3>👤 Your Dedicated Account Manager</h3>
+            <div style="display: flex; align-items: center; gap: 1rem; margin-top: 1rem;">
+                <div style="width: 60px; height: 60px; border-radius: 50%; background: #8B5CF6; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 1.5rem;">
+                    JS
+                </div>
+                <div>
+                    <h4 style="margin: 0;">Jamie Smith</h4>
+                    <p style="margin: 0.25rem 0; color: var(--text-light);">Senior Financial Advisor</p>
+                    <p style="margin: 0; font-size: 0.9rem;">jamie.smith@aobudgetai.com</p>
+                </div>
+            </div>
+            <div style="margin-top: 1rem;">
+                <button onclick="scheduleCall()" class="btn" style="background: var(--secondary);">
+                    📅 Schedule Call
+                </button>
+                <button onclick="sendMessage()" class="btn" style="background: var(--primary); margin-left: 0.5rem;">
+                    💬 Send Message
+                </button>
+            </div>
+        </div>
+
+        <!-- Available Plans -->
+        <div class="card">
+            <h2>Available Plans</h2>
+            <p>Manage your subscription or adjust your plan level</p>
+            
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2rem;">
+                
+                <!-- Freemium Plan -->
+                <div class="plan-card freemium">
+                    <div class="plan-badge badge-freemium">Freemium</div>
+                    <h3>Freemium</h3>
+                    <div class="price">$0/month</div>
+                    <ul class="feature-list">
+                        <li>Basic expense tracking</li>
+                        <li>Category management</li>
+                        <li>30-day transaction history</li>
+                        <li>Ad-supported experience</li>
+                        <li>Community support</li>
+                    </ul>
+                    <button onclick="downgradeToFreemium()" class="btn" style="background: #6B7280; width: 100%;">
+                        Downgrade to Free
+                    </button>
+                </div>
+                
+                <!-- Premium Plan -->
+                <div class="plan-card premium">
+                    <div class="plan-badge badge-premium">Premium</div>
+                    <h3>Premium</h3>
+                    <div class="price">$5/month</div>
+                    <ul class="feature-list">
+                        <li>All Freemium features</li>
+                        <li>AI-powered financial insights</li>
+                        <li>Ad-free experience</li>
+                        <li>Unlimited transaction history</li>
+                        <li>Advanced analytics & reports</li>
+                        <li>Priority email support</li>
+                        <li>Custom categories & tags</li>
+                    </ul>
+                    <button onclick="downgradeToPremium()" class="btn btn-premium" style="width: 100%;">
+                        Switch to Premium
+                    </button>
+                </div>
+                
+                <!-- Pro Plan -->
+                <div class="plan-card current">
+                    <div class="plan-badge badge-current">Current Plan</div>
+                    <h3>Professional</h3>
+                    <div class="price">$15/month</div>
+                    <ul class="feature-list">
+                        <li>All Premium features</li>
+                        <li>Advanced AI predictions</li>
+                        <li>Multi-wallet support</li>
+                        <li>Tax optimization insights</li>
+                        <li>Investment tracking</li>
+                        <li>Custom financial reports</li>
+                        <li>Dedicated account manager</li>
+                        <li>API access</li>
+                    </ul>
+                    <div class="btn btn-disabled" style="width: 100%; text-align: center;">
+                        Current Plan
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Billing Information -->
+        <div class="billing-section">
+            <h3>Billing Information</h3>
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                <div>
+                    <strong>Payment Method</strong>
+                    <p>AO Token Wallet</p>
+                </div>
+                <div>
+                    <strong>Billing Cycle</strong>
+                    <p>Monthly</p>
+                </div>
+                <div>
+                    <strong>Next Billing Date</strong>
+                    <p>October 27, 2025</p>
+                </div>
+                <div>
+                    <strong>Plan Status</strong>
+                    <p style="color: var(--secondary); font-weight: bold;">Active</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subscription Management -->
+        <div class="card">
+            <h3>Subscription Management</h3>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem;">
+                <button onclick="updatePaymentMethod()" class="btn" style="background: var(--primary);">
+                    💳 Update Payment Method
+                </button>
+                <button onclick="changeBillingCycle()" class="btn" style="background: var(--warning);">
+                    🔄 Change Billing Cycle
+                </button>
+                <button onclick="cancelSubscription()" class="btn" style="background: var(--danger);">
+                    🚫 Cancel Subscription
+                </button>
+            </div>
+        </div>
+
+        <!-- API Access Section -->
+        <div class="card">
+            <h3>🔧 API Access</h3>
+            <p>As a Pro user, you have access to our API for custom integrations and automation.</p>
+            <div style="background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-top: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>API Key</strong>
+                        <p style="margin: 0.25rem 0; font-family: monospace; background: #e9ecef; padding: 0.5rem; border-radius: 4px;">
+                            sk_pro_••••••••••••••••••••••••••••••••
+                        </p>
+                    </div>
+                    <div>
+                        <button onclick="regenerateApiKey()" class="btn" style="background: var(--warning);">
+                            Regenerate
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 1rem;">
+                <a href="api-documentation.html" class="btn" style="background: var(--primary);">
+                    📚 View API Documentation
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- No Ads on Subscription Pages -->
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 aoBudgetAI. Subscription Management.</p>
+        </div>
+    </footer>
+    
+    <script>
+        function downgradeToPremium() {
+            if (confirm('Switch to Premium plan for $5/month? You will lose Pro features like dedicated account manager and API access.')) {
+                // In real app, this would process downgrade
+                alert('Switching to Premium plan...');
+                window.location.href = 'premium-subscriptions.html';
+            }
+        }
+        
+        function downgradeToFreemium() {
+            if (confirm('Downgrade to Freemium? You will lose all premium features including AI insights and dedicated support.')) {
+                if (confirm('Are you sure? This will remove your Pro features and you will see ads.')) {
+                    // In real app, this would process downgrade
+                    alert('Downgrading to Freemium...');
+                    window.location.href = 'freemium-subscriptions.html';
+                }
+            }
+        }
+        
+        function showBillingHistory() {
+            alert('Billing history would show here with past payments and invoices.');
+        }
+        
+        function contactAccountManager() {
+            alert('Contacting your account manager Jamie Smith...');
+        }
+        
+        function scheduleCall() {
+            alert('Opening calendar to schedule a call with your account manager...');
+        }
+        
+        function sendMessage() {
+            alert('Opening message interface to contact your account manager...');
+        }
+        
+        function updatePaymentMethod() {
+            alert('Redirecting to payment method update...');
+        }
+        
+        function changeBillingCycle() {
+            alert('Billing cycle options would appear here.');
+        }
+        
+        function cancelSubscription() {
+            if (confirm('Are you sure you want to cancel your Pro subscription? You will lose access to advanced features.')) {
+                if (confirm('Final confirmation: Cancel your Pro subscription?')) {
+                    alert('Subscription cancelled. You will keep Pro features until the end of your billing period.');
+                    window.location.href = 'freemium-subscriptions.html';
+                }
+            }
+        }
+        
+        function regenerateApiKey() {
+            if (confirm('Regenerate your API key? This will invalidate your current key.')) {
+                alert('API key regenerated successfully. Update your integrations with the new key.');
+            }
+        }
+    </script>
+</body>
+</html>

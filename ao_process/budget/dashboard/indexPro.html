@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - aoBudgetAI (Premium)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2185D0;
+            --primary-dark: #1a6fb3;
+            --secondary: #21BA45;
+            --danger: #DB2828;
+            --warning: #F2711C;
+            --bg-dark: #0F0F0F;
+            --bg-light: #f9f9f9;
+            --bg-card: #FFFFFF;
+            --text: #1a1a1a;
+            --text-light: #666666;
+            --border: #ddd;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-light);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+        
+        .dashboard-section {
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+        
+        .stat-card {
+            padding: 1.5rem;
+            border-radius: 8px;
+            background: #f8f9fa;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+        
+        .category-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+        
+        .progress-bar {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 8px;
+            margin: 0.5rem 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            border-radius: 10px;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        
+        .btn:hover {
+            background: var(--primary-dark);
+        }
+        
+        .btn-success {
+            background: var(--secondary);
+        }
+        
+        .btn-premium {
+            background: gold;
+            color: black;
+            font-weight: bold;
+        }
+        
+        .premium-banner {
+            background: linear-gradient(135deg, gold, #ffd700);
+            color: black;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .upgrade-banner {
+            background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        nav {
+            background: linear-gradient(135deg, #0f2f3f 0%, #1a202c 100%);
+            padding: 1rem;
+            color: white;
+        }
+        
+        nav .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1rem;
+        }
+        
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        
+        nav .nav-links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+        
+        nav .nav-links a {
+            font-size: 1rem;
+            font-weight: normal;
+        }
+        
+        nav .nav-links .premium-link {
+            color: gold;
+        }
+        
+        footer {
+            background: #1a1a1a;
+            padding: 2rem 0;
+            margin-top: 3rem;
+            color: #888;
+        }
+        
+        footer .container {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation for Premium Users -->
+    <nav>
+        <div class="container">
+            <a href="premium.html">aoBudgetAI</a>
+            <div class="nav-links">
+                <span style="color: gold;">⭐ Premium</span>
+                <a href="premium.html" style="border-bottom: 2px solid white;">Dashboard</a>
+                <a href="transactions.html">Transactions</a>
+                <a href="categories.html">Categories</a>
+                <a href="reports.html">Reports</a>
+                <a href="add-income.html">Add Income</a>
+                <a href="add-expense.html">Add Expense</a>
+                <a href="ai-analysis.html" style="color: white; text-decoration: none;">🤖 AI Analysis</a>
+                <a href="index.html">← Back to Home</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container" style="padding: 2rem;">
+        <!-- Premium Banner for Premium Users -->
+        <div class="premium-banner">
+            <h3>⭐ Premium Member</h3>
+            <p>You have full access to all features including AI Analysis!</p>
+            <a href="ai-analysis.html" class="btn" style="background: black; color: gold;">Go to AI Analysis</a>
+        </div>
+
+        <!-- Wallet Connection Status -->
+        <div id="walletStatus" class="dashboard-section">
+            <h3>Wallet Connection</h3>
+            <p>Connect your wallet to view your financial data.</p>
+            <button class="btn" onclick="connectWallet()">Connect Wallet</button>
+        </div>
+        
+        <!-- Loading State -->
+        <div id="loadingState" class="dashboard-section" style="display: none;">
+            <h3>Loading Transactions</h3>
+            <p>Please wait while we fetch your financial data...</p>
+        </div>
+        
+        <!-- Main Dashboard Content -->
+        <div id="dashboardContent" style="display: none;">
+            <!-- Overview Section -->
+            <div id="overviewSection"></div>
+            
+            <!-- Category Breakdown -->
+            <div id="categorySection"></div>
+            
+            <!-- History Chart -->
+            <div class="dashboard-section">
+                <h2>Income vs Expenses History</h2>
+                <canvas id="historyChart" width="400" height="200"></canvas>
+            </div>
+            
+            <!-- AI Insights Section (Premium Only) -->
+            <div class="dashboard-section">
+                <h2>🤖 AI Financial Insights</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    <div>
+                        <h3>Financial Health Score</h3>
+                        <div style="text-align: center; margin: 1rem 0;">
+                            <div style="font-size: 3rem; font-weight: bold; color: #21BA45;">78/100</div>
+                            <div style="color: #666;">Good Financial Health</div>
+                        </div>
+                        <ul>
+                            <li>Income-to-Expense Ratio: <strong>1.49</strong> (Healthy)</li>
+                            <li>Savings Rate: <strong>32.9%</strong> (Excellent)</li>
+                            <li>Emergency Fund: <strong>4.2 months</strong> (Good)</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3>AI Recommendations</h3>
+                        <div style="background: #f0f8ff; padding: 1rem; border-radius: 6px;">
+                            <h4>💡 Smart Suggestions</h4>
+                            <ul>
+                                <li>Consider investing $500 of your monthly surplus</li>
+                                <li>Your food expenses are 15% below your category average</li>
+                                <li>You could save $50/month by optimizing subscriptions</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="dashboard-section">
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                    <a href="add-income.html" class="btn btn-success">💰 Add Income</a>
+                    <a href="add-expense.html" class="btn" style="background: #DB2828;">💳 Add Expense</a>
+                    <button onclick="refreshData()" class="btn" style="background: #2185D0;">🔄 Refresh Data</button>
+                    <button onclick="checkUserRole()" class="btn" style="background: #6435C9;">👤 Check Role</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Error State -->
+        <div id="errorState" class="dashboard-section" style="display: none; background: #ffe6e6;">
+            <h3 style="color: red;">Error</h3>
+            <p id="errorMessage"></p>
+            <button class="btn" onclick="dismissError()">Dismiss</button>
+        </div>
+    </div>
+
+    <!-- No Ads for Premium Users -->
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 aoBudgetAI. Budget Management.</p>
+        </div>
+    </footer>
+
+    <script>
+        let transactions = [];
+        let timeFilter = 'last35days';
+        let userRole = 'premium';
+        
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            checkUserRole();
+        });
+        
+        function checkUserRole() {
+            // For premium, we always show the premium banner
+            updateRoleUI('premium');
+        }
+        
+        function updateRoleUI(role) {
+            loadDashboardData();
+        }
+        
+        function loadDashboardData() {
+            document.getElementById('walletStatus').style.display = 'none';
+            document.getElementById('loadingState').style.display = 'block';
+            
+            setTimeout(() => {
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('dashboardContent').style.display = 'block';
+                
+                updateFinancialOverview();
+                updateCategoryBreakdown();
+                createHistoryChart();
+            }, 1500);
+        }
+        
+        function updateFinancialOverview() {
+            const overviewSection = document.getElementById('overviewSection');
+            overviewSection.innerHTML = `
+                <div class="dashboard-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                        <h2>Financial Overview</h2>
+                        <select id="timeFilter" onchange="updateTimeFilter(this.value)" style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                            <option value="last7days">Last 7 days</option>
+                            <option value="last30days">Last 30 days</option>
+                            <option value="last35days" selected>Last 35 days</option>
+                            <option value="last90days">Last 90 days</option>
+                        </select>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div style="color: green; font-weight: bold;">💰 Income</div>
+                            <div class="stat-value">$4,250</div>
+                            <div style="color: #666;">USDA</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div style="color: red; font-weight: bold;">💳 Expenses</div>
+                            <div class="stat-value">$2,850</div>
+                            <div style="color: #666;">USDA</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div style="color: blue; font-weight: bold;">⚖️ Balance</div>
+                            <div class="stat-value">$1,400</div>
+                            <div style="color: #666;">USDA</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function updateCategoryBreakdown() {
+            const categorySection = document.getElementById('categorySection');
+            categorySection.innerHTML = `
+                <div class="dashboard-section">
+                    <h2>Category Breakdown</h2>
+                    <div class="category-grid">
+                        <div>
+                            <h3>Income Categories</h3>
+                            <div>
+                                <div style="margin-bottom: 1rem;">
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Salary</span>
+                                        <span>$3,000</span>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 70%; background: green;"></div>
+                                    </div>
+                                    <div style="text-align: right; font-size: 0.8rem; color: #666;">70.6%</div>
+                                </div>
+                                <div style="margin-bottom: 1rem;">
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Freelance</span>
+                                        <span>$1,250</span>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 29.4%; background: green;"></div>
+                                    </div>
+                                    <div style="text-align: right; font-size: 0.8rem; color: #666;">29.4%</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h3>Expense Categories</h3>
+                            <div>
+                                <div style="margin-bottom: 1rem;">
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Housing</span>
+                                        <span>$1,200</span>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 42%; background: red;"></div>
+                                    </div>
+                                    <div style="text-align: right; font-size: 0.8rem; color: #666;">42.1%</div>
+                                </div>
+                                <div style="margin-bottom: 1rem;">
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Food</span>
+                                        <span>$450</span>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 16%; background: red;"></div>
+                                    </div>
+                                    <div style="text-align: right; font-size: 0.8rem; color: #666;">15.8%</div>
+                                </div>
+                                <div style="margin-bottom: 1rem;">
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Transportation</span>
+                                        <span>$300</span>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 10.5%; background: red;"></div>
+                                    </div>
+                                    <div style="text-align: right; font-size: 0.8rem; color: #666;">10.5%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function createHistoryChart() {
+            const ctx = document.getElementById('historyChart').getContext('2d');
+            if (ctx) {
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                        datasets: [
+                            {
+                                label: 'Income',
+                                data: [3000, 3200, 3100, 3300, 4250, 4000],
+                                borderColor: 'green',
+                                backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Expenses',
+                                data: [2500, 2600, 2700, 2800, 2850, 2900],
+                                borderColor: 'red',
+                                backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                                tension: 0.4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Monthly Income vs Expenses'
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        function connectWallet() {
+            document.getElementById('walletStatus').style.display = 'none';
+            document.getElementById('loadingState').style.display = 'block';
+            setTimeout(() => {
+                checkUserRole();
+            }, 1000);
+        }
+        
+        function refreshData() {
+            document.getElementById('loadingState').style.display = 'block';
+            setTimeout(() => {
+                document.getElementById('loadingState').style.display = 'none';
+                updateFinancialOverview();
+                updateCategoryBreakdown();
+            }, 1000);
+        }
+        
+        function dismissError() {
+            document.getElementById('errorState').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
+

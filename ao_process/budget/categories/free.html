@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Categories - aoBudgetAI (Freemium)</title>
+    <style>
+        :root {
+            --primary: #2185D0;
+            --primary-dark: #1a6fb3;
+            --secondary: #21BA45;
+            --danger: #DB2828;
+            --warning: #F2711C;
+            --bg-dark: #0F0F0F;
+            --bg-light: #f9f9f9;
+            --bg-card: #FFFFFF;
+            --text: #1a1a1a;
+            --text-light: #666666;
+            --border: #ddd;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-light);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+        
+        .card {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .btn {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        
+        .btn:hover {
+            background: var(--primary-dark);
+        }
+        
+        .btn-success {
+            background: var(--secondary);
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+        }
+        
+        .btn-warning {
+            background: var(--warning);
+        }
+        
+        .btn-premium {
+            background: gold;
+            color: black;
+            font-weight: bold;
+        }
+        
+        .premium-banner {
+            background: linear-gradient(135deg, gold, #ffd700);
+            color: black;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .upgrade-banner {
+            background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        nav {
+            background: linear-gradient(135deg, #0f2f3f 0%, #1a202c 100%);
+            padding: 1rem;
+            color: white;
+        }
+        
+        nav .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1rem;
+        }
+        
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        
+        nav .nav-links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+        
+        nav .nav-links a {
+            font-size: 1rem;
+            font-weight: normal;
+        }
+        
+        nav .nav-links .premium-link {
+            color: gold;
+        }
+        
+        footer {
+            background: #1a1a1a;
+            padding: 2rem 0;
+            margin-top: 3rem;
+            color: #888;
+        }
+        
+        footer .container {
+            text-align: center;
+        }
+        
+        .message {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+        
+        .message-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        
+        .message-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        
+        .message-error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .categories-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .category-card {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+        
+        .category-card.income {
+            border-left: 4px solid var(--secondary);
+        }
+        
+        .category-card.expense {
+            border-left: 4px solid var(--danger);
+        }
+        
+        .category-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .category-actions {
+            margin-top: 1rem;
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+        }
+        
+        .icon-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 1.2rem;
+        }
+        
+        .icon-btn:hover {
+            background: #f8f9fa;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background: white;
+            margin: 10% auto;
+            padding: 2rem;
+            border-radius: 8px;
+            max-width: 500px;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 2rem 0 1rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .placeholder-section {
+            text-align: center;
+            padding: 3rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin: 2rem 0;
+        }
+        
+        .premium-category-tip {
+            background: linear-gradient(135deg, gold, #fff9e6);
+            border-left: 4px solid gold;
+            padding: 1rem;
+            margin: 1rem 0;
+            color: black;
+        }
+        
+        .ad-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #2d3748;
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            max-width: 300px;
+            display: none;
+        }
+        
+        .ad-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 0.5rem;
+        }
+        
+        .ad-close {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            margin-left: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation for Freemium Users -->
+    <nav>
+        <div class="container">
+            <a href="freemium.html">aoBudgetAI</a>
+            <div class="nav-links">
+                <span style="color: white;">Free</span>
+                <a href="freemium.html" style="border-bottom: 2px solid white;">Dashboard</a>
+                <a href="transactions.html">Transactions</a>
+                <a href="freemium-categories.html" style="border-bottom: 2px solid white;">Categories</a>
+                <a href="reports.html">Reports</a>
+                <a href="add-income.html">Add Income</a>
+                <a href="add-expense.html">Add Expense</a>
+                <a href="upgrade.html" class="premium-link">✨ Upgrade to Premium</a>
+                <a href="index.html">← Back to Home</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <!-- Upgrade Banner for Freemium Users -->
+        <div class="upgrade-banner">
+            <h3>✨ Upgrade to Premium</h3>
+            <p>Unlock AI-powered financial insights and remove ads!</p>
+            <a href="upgrade.html" class="btn btn-premium">Upgrade Now</a>
+        </div>
+
+        <!-- Header Section -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h1 style="margin: 0;">📁 Categories</h1>
+                <div style="display: flex; gap: 1rem;">
+                    <a href="add-category.html" class="btn btn-success">+ Add Category</a>
+                    <button onclick="refreshCategories()" class="btn">🔄 Refresh</button>
+                    <button onclick="showMockModal()" class="btn btn-warning">✨ Mock Data</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Information Message -->
+        <div class="message message-info">
+            <h3>Managing Categories</h3>
+            <p>Categories help you organize your transactions. You can add new categories and delete existing ones. Be careful when deleting categories as this action cannot be undone.</p>
+            <p><strong>User Role: Free</strong></p>
+        </div>
+
+        <!-- Wallet Connection Warning -->
+        <div class="message message-warning">
+            <h3>Wallet Integration Notice</h3>
+            <p>In a production environment, this would connect to your Arweave wallet. For this demo, categories are stored locally.</p>
+        </div>
+
+        <!-- AI Feature Locked Message -->
+        <div class="message message-warning">
+            <h3>🤖 AI Category Optimization</h3>
+            <p>Upgrade to Premium to unlock AI-powered category analysis and optimization features!</p>
+            <a href="upgrade.html" class="btn btn-premium" style="margin-top: 0.5rem;">Upgrade to Unlock AI</a>
+        </div>
+
+        <!-- Income Categories Section -->
+        <div id="incomeSection">
+            <div class="section-header">
+                <h2 style="color: var(--secondary); margin: 0;">💰 Income Categories</h2>
+                <span id="incomeCount">4 categories</span>
+            </div>
+
+            <div id="incomeCategories" class="categories-grid">
+                <!-- Income categories will be populated here -->
+            </div>
+        </div>
+
+        <!-- Expense Categories Section -->
+        <div id="expenseSection">
+            <div class="section-header">
+                <h2 style="color: var(--danger); margin: 0;">💳 Expense Categories</h2>
+                <span id="expenseCount">6 categories</span>
+            </div>
+
+            <div id="expenseCategories" class="categories-grid">
+                <!-- Expense categories will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <h3>Delete Category</h3>
+            <p id="deleteModalText">Are you sure you want to delete this category? This action cannot be undone.</p>
+            <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                <button onclick="closeDeleteModal()" class="btn" style="background: #6c757d;">Cancel</button>
+                <button onclick="confirmDelete()" class="btn btn-danger">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mock Data Modal -->
+    <div id="mockModal" class="modal">
+        <div class="modal-content">
+            <h3>Create Mock Categories</h3>
+            <p>Would you like to add sample categories to test the application? This will create:</p>
+            <ul>
+                <li>4 income categories (Salary, Freelance, Investments, Bonus)</li>
+                <li>6 expense categories (Housing, Food, Transportation, etc.)</li>
+            </ul>
+            <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                <button onclick="closeMockModal()" class="btn" style="background: #6c757d;">Cancel</button>
+                <button onclick="addMockCategories()" class="btn btn-warning">Create Mock Categories</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ads for Freemium Users -->
+    <div id="adContainer" class="ad-container">
+        <div class="ad-header">
+            <strong>Advertisement</strong>
+            <button onclick="closeAd()" class="ad-close">✕</button>
+        </div>
+        <p style="margin: 0; font-size: 0.9rem;">Upgrade to Premium to remove ads and unlock AI features!</p>
+        <a href="upgrade.html" style="color: gold; text-decoration: none; font-size: 0.8rem;">Upgrade Now</a>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 aoBudgetAI. Budget Management.</p>
+        </div>
+    </footer>
+    
+    <script>
+        let categories = [
+            // Income Categories
+            {
+                id: "1",
+                name: "Salary",
+                description: "Monthly salary income",
+                type: "income",
+                icon: "💰",
+                transaction_count: 12
+            },
+            {
+                id: "2",
+                name: "Freelance",
+                description: "Freelance work income",
+                type: "income", 
+                icon: "💻",
+                transaction_count: 8
+            },
+            {
+                id: "3",
+                name: "Investments",
+                description: "Investment returns",
+                type: "income",
+                icon: "📈",
+                transaction_count: 5
+            },
+            {
+                id: "4", 
+                name: "Bonus",
+                description: "Performance bonuses",
+                type: "income",
+                icon: "🎁",
+                transaction_count: 2
+            },
+            
+            // Expense Categories
+            {
+                id: "5",
+                name: "Housing",
+                description: "Rent and mortgage payments",
+                type: "expense",
+                icon: "🏠",
+                transaction_count: 24
+            },
+            {
+                id: "6",
+                name: "Food",
+                description: "Groceries and dining",
+                type: "expense",
+                icon: "🍕",
+                transaction_count: 45
+            },
+            {
+                id: "7",
+                name: "Transportation",
+                description: "Gas, parking, and transit",
+                type: "expense",
+                icon: "🚗",
+                transaction_count: 18
+            },
+            {
+                id: "8",
+                name: "Entertainment",
+                description: "Movies, games, and hobbies",
+                type: "expense",
+                icon: "🎮",
+                transaction_count: 12
+            },
+            {
+                id: "9",
+                name: "Healthcare",
+                description: "Medical expenses",
+                type: "expense",
+                icon: "🏥",
+                transaction_count: 6
+            },
+            {
+                id: "10",
+                name: "Utilities",
+                description: "Electricity, water, internet",
+                type: "expense",
+                icon: "💡",
+                transaction_count: 18
+            }
+        ];
+        
+        let categoryToDelete = null;
+        let adTimer;
+        
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            showCategories();
+        });
+        
+        function showCategories() {
+            const incomeCategories = categories.filter(cat => cat.type === 'income');
+            const expenseCategories = categories.filter(cat => cat.type === 'expense');
+            
+            // Update counts
+            document.getElementById('incomeCount').textContent = `${incomeCategories.length} categories`;
+            document.getElementById('expenseCount').textContent = `${expenseCategories.length} categories`;
+            
+            // Populate income categories
+            const incomeContainer = document.getElementById('incomeCategories');
+            incomeContainer.innerHTML = '';
+            
+            incomeCategories.forEach(category => {
+                const card = createCategoryCard(category);
+                incomeContainer.appendChild(card);
+            });
+            
+            // Populate expense categories
+            const expenseContainer = document.getElementById('expenseCategories');
+            expenseContainer.innerHTML = '';
+            
+            expenseCategories.forEach(category => {
+                const card = createCategoryCard(category);
+                expenseContainer.appendChild(card);
+            });
+        }
+        
+        function createCategoryCard(category) {
+            const card = document.createElement('div');
+            card.className = `category-card ${category.type}`;
+            
+            card.innerHTML = `
+                <div class="category-icon">${category.icon}</div>
+                <h3>${category.name}</h3>
+                <p style="color: var(--text-light); margin: 0.5rem 0;">${category.description}</p>
+                <small style="color: var(--text-light);">${category.transaction_count} transactions</small>
+                <div class="category-actions">
+                    <button onclick="deleteCategory('${category.id}', '${category.name}')" class="icon-btn" title="Delete category">
+                        🗑️
+                    </button>
+                </div>
+            `;
+            
+            return card;
+        }
+        
+        function deleteCategory(id, name) {
+            categoryToDelete = { id, name };
+            document.getElementById('deleteModalText').textContent = 
+                `Are you sure you want to delete "${name}"? This action cannot be undone.`;
+            document.getElementById('deleteModal').style.display = 'block';
+        }
+        
+        function confirmDelete() {
+            if (categoryToDelete) {
+                categories = categories.filter(cat => cat.id !== categoryToDelete.id);
+                
+                // In a real app, this would call an AO process handler to delete from storage
+                console.log('Deleted category:', categoryToDelete.name);
+                
+                showCategories();
+                closeDeleteModal();
+                
+                // Show success message
+                showTemporaryMessage('Category deleted successfully!', 'info');
+            }
+        }
+        
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'none';
+            categoryToDelete = null;
+        }
+        
+        function showMockModal() {
+            document.getElementById('mockModal').style.display = 'block';
+        }
+        
+        function closeMockModal() {
+            document.getElementById('mockModal').style.display = 'none';
+        }
+        
+        function addMockCategories() {
+            // Reset to original categories
+            categories = [
+                {
+                    id: "1",
+                    name: "Salary",
+                    description: "Monthly salary income",
+                    type: "income",
+                    icon: "💰",
+                    transaction_count: 12
+                },
+                {
+                    id: "2",
+                    name: "Freelance",
+                    description: "Freelance work income",
+                    type: "income", 
+                    icon: "💻",
+                    transaction_count: 8
+                },
+                {
+                    id: "3",
+                    name: "Investments",
+                    description: "Investment returns",
+                    type: "income",
+                    icon: "📈",
+                    transaction_count: 5
+                },
+                {
+                    id: "4", 
+                    name: "Bonus",
+                    description: "Performance bonuses",
+                    type: "income",
+                    icon: "🎁",
+                    transaction_count: 2
+                },
+                {
+                    id: "5",
+                    name: "Housing",
+                    description: "Rent and mortgage payments",
+                    type: "expense",
+                    icon: "🏠",
+                    transaction_count: 24
+                },
+                {
+                    id: "6",
+                    name: "Food",
+                    description: "Groceries and dining",
+                    type: "expense",
+                    icon: "🍕",
+                    transaction_count: 45
+                },
+                {
+                    id: "7",
+                    name: "Transportation",
+                    description: "Gas, parking, and transit",
+                    type: "expense",
+                    icon: "🚗",
+                    transaction_count: 18
+                },
+                {
+                    id: "8",
+                    name: "Entertainment",
+                    description: "Movies, games, and hobbies",
+                    type: "expense",
+                    icon: "🎮",
+                    transaction_count: 12
+                },
+                {
+                    id: "9",
+                    name: "Healthcare",
+                    description: "Medical expenses",
+                    type: "expense",
+                    icon: "🏥",
+                    transaction_count: 6
+                },
+                {
+                    id: "10",
+                    name: "Utilities",
+                    description: "Electricity, water, internet",
+                    type: "expense",
+                    icon: "💡",
+                    transaction_count: 18
+                }
+            ];
+            
+            showCategories();
+            closeMockModal();
+            
+            // Show success message
+            showTemporaryMessage('Mock categories added successfully!', 'info');
+        }
+        
+        function refreshCategories() {
+            showTemporaryMessage('Categories refreshed!', 'info');
+        }
+        
+        function showTemporaryMessage(message, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message message-${type}`;
+            messageDiv.innerHTML = `<p>${message}</p>`;
+            
+            document.querySelector('.container').insertBefore(messageDiv, document.querySelector('.container').firstChild);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 3000);
+        }
+        
+        // Ad Functions
+        function showAd() {
+            const adContainer = document.getElementById('adContainer');
+            if (adContainer) {
+                adContainer.style.display = 'block';
+                setTimeout(() => {
+                    adContainer.style.display = 'none';
+                }, 10000);
+            }
+        }
+        
+        function closeAd() {
+            const adContainer = document.getElementById('adContainer');
+            if (adContainer) {
+                adContainer.style.display = 'none';
+            }
+        }
+        
+        // Show ad every minute (60000 ms)
+        adTimer = setInterval(showAd, 60000);
+        setTimeout(showAd, 5000);
+        
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                closeDeleteModal();
+                closeMockModal();
+            }
+        }
+    </script>
+</body>
+</html>

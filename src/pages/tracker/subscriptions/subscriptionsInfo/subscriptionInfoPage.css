@@ -1,0 +1,108 @@
+.token-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.token-option {
+  border: 2px solid #333;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #2a2a2a;
+}
+
+.token-option:hover {
+  border-color: #4285F4;
+  background: #2d3748;
+}
+
+.token-option.selected {
+  border-color: #4285F4;
+  background: rgba(66, 133, 244, 0.1);
+}
+
+.token-symbol {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.token-type {
+  font-size: 0.8rem;
+  color: #888;
+  text-transform: capitalize;
+}
+
+.calculating {
+  font-size: 0.8rem;
+  color: #f59e0b;
+  margin-top: 0.5rem;
+}
+
+.transfer-details {
+  background: #2d3748;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  border: 1px solid #4a5568;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #4a5568;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.amount {
+  font-weight: bold;
+  color: #4285F4;
+  font-size: 1.1rem;
+}
+
+.fee-breakdown {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #4a5568;
+}
+
+.fee-breakdown h5 {
+  margin-bottom: 1rem;
+  color: #ccc;
+}
+
+.fee-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.subscribe-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loading-price {
+  text-align: center;
+  padding: 1rem;
+  color: #f59e0b;
+}
+
+.price-error {
+  background: #fed7d7;
+  color: #c53030;
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
