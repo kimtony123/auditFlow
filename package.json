@@ -1,40 +1,41 @@
 {
-  "name": "audit-flow",
+  "name": "audit_flow",
   "version": "1.0.0",
-  "private": true,
-   "engines": {
-    "node": ">=22.12.0",
-    "npm": ">=10.9.0"
-  },
+  "description": "",
+  "main": "index.js",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kimtony123/auditFlow.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kimtony123/auditFlow/issues"
+  },
+  "homepage": "https://github.com/kimtony123/auditFlow#readme",
+  "type": "module",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^4.0.3",
+    "@nomicfoundation/hardhat-ignition": "^3.0.6",
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^3.0.2",
+    "@types/chai": "^4.3.20",
+    "@types/chai-as-promised": "^8.0.2",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.19.2",
+    "chai": "^5.3.3",
+    "dotenv": "^17.2.3",
+    "ethers": "^6.16.0",
+    "forge-std": "github:foundry-rs/forge-std#v1.9.4",
+    "hardhat": "^3.1.0",
+    "mocha": "^11.7.5",
+    "typescript": "~5.8.0"
   },
   "dependencies": {
-    "@arweave-wallet-kit/browser-wallet-strategy": "^0.1.1",
-    "@arweave-wallet-kit/othent-strategy": "^0.1.1",
-    "@arweave-wallet-kit/react": "^0.3.2",
-    "@arweave-wallet-kit/wander-strategy": "^0.1.2",
-    "@arweave-wallet-kit/webwallet-strategy": "^0.0.1-beta.4",
-    "@permaweb/aoconnect": "^0.0.85",
-    "@tanstack/react-query": "^4.36.1",
-    "antd": "^5.13.7",
-    "axios": "^1.9.0",
-    "dayjs": "^1.11.10",
-    "process": "^0.11.10",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^7.9.4",
-    "react-use": "^17.4.0",
-    "util": "^0.12.5",
-    "vite-plugin-node-polyfills": "^0.24.0"
-  },
-  "devDependencies": {
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.2.1",
-    "typescript": "^5.4.5",
-    "vite": "^7.2.7"
+    "@types/react-router-dom": "^5.3.3",
+    "react-router-dom": "^7.10.1"
   }
 }
