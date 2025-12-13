@@ -2,7 +2,6 @@
 import { createContext, type ReactNode, useEffect, useState, useContext } from 'react';
 import { ethers } from 'ethers';
 import {
-  getProvider,
   getCurrentAccount,
   isWalletInstalled,
   connectWallet,
@@ -231,27 +230,3 @@ export const useWallet = () => {
 
 export default WalletProvider;
 
-// CSS styles for the loading state
-const styles = `
-.wallet-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 200px;
-  gap: 16px;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid #e0e0e0;
-  border-top-color: #667eea;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-`;

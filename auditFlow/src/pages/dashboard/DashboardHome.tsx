@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import { ethers } from "ethers";
 import { LiskTestToken__factory, TOKEN_ADDRESS } from "../../utils/contractHelpers";
 import { useWallet } from "../../services/WalletProvider";
-import WalletButton from "../../components/WalletButton";
 import type { UserTier } from "../../context/UserTypeContext";
 import { DivviService } from "../../services/Divvi";
 import "./dash.css"
@@ -151,7 +150,8 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
       
       if (divviEnabled) {
         try {
-          referralTag = DivviService.generateReferralTag(account);
+          referralTag = DivviService.generateReferralTagFromString(account);
+;
           if (referralTag && referralTag.length > 0) {
             hasDivviTag = true;
             console.log("Divvi referral tag generated:", referralTag.substring(0, 20) + "...");
@@ -216,12 +216,11 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
             const chainId = (await signer.provider?.getNetwork())?.chainId || 4202;
             
             // Submit to Divvi
-            const referralSubmitted = await DivviService.submitReferral({
-              txHash: tx.hash,
-              chainId: Number(chainId),
-              userAddress: ""
-            });
-            
+            const referralSubmitted = await DivviService.submitReferralFromStrings(
+          tx.hash,
+          Number(chainId),
+          account); 
+           
             if (referralSubmitted) {
               setReferralStatus('success');
               successMessage += ` Referral tracking enabled! 🎯`;

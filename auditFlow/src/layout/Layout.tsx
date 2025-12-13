@@ -3,6 +3,7 @@ import NavBar from "../components/navbar/NavBar";
 import Sidebar from "../components/sidebar/Sidebar";
 import { useWallet } from "../services/WalletProvider";
 import "./Layout.css";
+import WalletButton from "../components/WalletButton";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -22,7 +23,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   userTier = 'basic',
   userUsage 
 }) => {
-  const { isConnected, connectWallet } = useWallet();
+  const { isConnected } = useWallet();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
@@ -52,9 +53,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 <div className="connect-prompt-icon">🔒</div>
                 <h2>Connect Your Wallet</h2>
                 <p>Please connect your wallet to access this page</p>
-                <button onClick={connectWallet} className="connect-btn">
-                  Connect Wallet
-                </button>
+                <WalletButton />
               </div>
             ) : (
               children

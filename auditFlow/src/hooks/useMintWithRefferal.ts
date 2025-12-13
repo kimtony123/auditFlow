@@ -48,7 +48,7 @@ export const useMintWithReferral = ({ account, getSigner, isOnLisk }: UseMintWit
       
       if (DivviService.isConfigured()) {
         try {
-          referralTag = DivviService.generateReferralTag(account);
+          referralTag = DivviService.generateReferralTagFromString(account);
           isDivviEnabled = !!referralTag;
           console.log('Divvi referral tag generated:', referralTag);
         } catch (error) {
@@ -103,11 +103,11 @@ export const useMintWithReferral = ({ account, getSigner, isOnLisk }: UseMintWit
           setReferralStatus('pending');
           const chainId = (await signer.provider?.getNetwork())?.chainId || 4202;
           
-          const referralSubmitted = await DivviService.submitReferral({
-            txHash: tx.hash,
-            chainId: Number(chainId),
-            userAddress: account,
-          });
+         const referralSubmitted = await DivviService.submitReferralFromStrings(
+  tx.hash,
+  Number(chainId),
+  account
+);
           
           setReferralStatus(referralSubmitted ? 'success' : 'error');
           

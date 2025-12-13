@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link,  useLocation } from "react-router-dom";
 import { useWallet } from "../../services/WalletProvider";
 import WalletButton from "../WalletButton";
 import { useTheme } from "../../services/ThemeProvider";
@@ -19,7 +19,6 @@ const NavBar: React.FC<NavBarProps> = ({
 }) => {
   const { account, isConnected } = useWallet();
   const { theme, toggleTheme } = useTheme();
-  const navigate = useNavigate();
   const location = useLocation();
   
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -54,27 +53,7 @@ const NavBar: React.FC<NavBarProps> = ({
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const getNetworkName = (chainId: number | null) => {
-    if (!chainId) return "Unknown";
-    
-    const networks: Record<number, string> = {
-      1: "Ethereum",
-      56: "BSC",
-      137: "Polygon",
-      43114: "Avalanche",
-      42161: "Arbitrum",
-      10: "Optimism",
-      8453: "Base",
-      100: "Gnosis",
-      250: "Fantom",
-      1666600000: "Harmony",
-      1284: "Moonbeam",
-      1285: "Moonriver",
-    };
-    
-    return networks[chainId] || `Chain ${chainId}`;
-  };
-
+  
   // Navigation links based on variant
   const navLinks = {
     landing: [

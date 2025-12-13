@@ -20,7 +20,6 @@ interface TierUsageCheckerProps {
 const TierUsageChecker: React.FC<TierUsageCheckerProps> = ({
   userTier,
   userUsage,
-  actionType = 'analysis',
   children,
   showUpgradePrompt = true
 }) => {

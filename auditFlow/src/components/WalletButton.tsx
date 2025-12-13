@@ -3,7 +3,7 @@ import { useWallet } from '../services/WalletProvider';
 
 const WalletButton = () => {
   const {
-    account,
+
     formattedAddress,
     isConnected,
     isOnLisk,

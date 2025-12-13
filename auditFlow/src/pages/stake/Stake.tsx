@@ -11,26 +11,17 @@ import {
 import { ethers } from "ethers";
 import "./Stake.css";
 
-// Tier enum matching contract
-enum Tier {
-  NONE = 0,
-  BASIC = 1,
-  PREMIUM = 2,
-  PRO = 3,
-  ENTERPRISE = 4
-}
+// Replace enum with const object and type
+type TierType = 1 | 2 | 3 | 4;
+const Tier = {
+  BASIC: 1 as TierType,
+  PREMIUM: 2 as TierType,
+  PRO: 3 as TierType,
+  ENTERPRISE: 4 as TierType
+} as const;
 
-interface TierInfo {
-  tierId: number;
-  name: string;
-  description: string;
-  baseTokens: bigint;
-  maxTokens: bigint;
-  featureAccess: number[];
-  minStakeDays: number;
-  maxStakeDays: number;
-  yieldRate: number;
-}
+// Type for user tier in Layout
+type UserTierType = 'basic' | 'premium' | 'pro' | 'enterprise';
 
 interface UserStakeInfo {
   hasActiveStake: boolean;
@@ -43,7 +34,7 @@ interface UserStakeInfo {
 }
 
 interface TierOption {
-  id: Tier;
+  id: TierType;
   name: string;
   description: string;
   minStake: number;
@@ -53,12 +44,12 @@ interface TierOption {
 const Stake: React.FC = () => {
   const { account, isConnected, getSigner, isOnLisk } = useWallet();
   
-  // State for user's current stake
+  // State for user's current stake - properly typed for Layout
   const [userStake, setUserStake] = useState<UserStakeInfo | null>(null);
-  const [currentTier, setCurrentTier] = useState<string>("basic");
+  const [currentTier, setCurrentTier] = useState<UserTierType>('basic');
   
-  // State for new stake
-  const [selectedTier, setSelectedTier] = useState<Tier>(Tier.PREMIUM);
+  // State for new stake - use TierType
+  const [selectedTier, setSelectedTier] = useState<TierType>(Tier.PREMIUM);
   const [stakingDuration, setStakingDuration] = useState<number>(30);
   const [requiredStake, setRequiredStake] = useState<string>("0");
   
@@ -122,20 +113,21 @@ const Stake: React.FC = () => {
           // Get user's tier info
           const tierInfo = await stakingContract.getMyTierInfo();
           
-          // Update current tier for UI
-          const tierMap: { [key: number]: string } = {
+          // Update current tier for UI with proper type
+          const tierMap: Record<number, UserTierType> = {
             1: "basic",
             2: "premium", 
             3: "pro",
             4: "enterprise"
           };
-          setCurrentTier(tierMap[Number(tierInfo.tierId)] || "basic");
+          const tierId = Number(tierInfo.tierId);
+          setCurrentTier(tierMap[tierId] || "basic");
           
           // Set user stake info
           if (tierInfo.hasActiveStake) {
             setUserStake({
               hasActiveStake: true,
-              tierId: Number(tierInfo.tierId),
+              tierId: tierId,
               amountStaked: tierInfo.stakedAmount,
               stakedAt: tierInfo.stakeStartTime,
               unlocksAt: tierInfo.stakeEndTime,

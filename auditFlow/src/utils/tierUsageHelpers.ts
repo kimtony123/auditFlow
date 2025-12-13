@@ -74,12 +74,10 @@ export const canPerformAnalysis = (
 };
 
 export const canStakeForTier = (
-  currentTier: UserTier,
   targetTier: UserTier,
   currentStakedAmount: number,
   walletBalance: number
 ): TierCheckResult => {
-  const currentLimits = getTierLimits(currentTier);
   const targetLimits = getTierLimits(targetTier);
   
   if (targetLimits.requiredStake === 'Unlimited') {
