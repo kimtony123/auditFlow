@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import NavigationButton from "../../components/NavigationsButton";
+import { useTheme } from "../../services/ThemeProvider";
+
 import "./Home.css";
 
 const Home: React.FC = () => {
@@ -101,6 +103,8 @@ const Home: React.FC = () => {
   // Duration presets
   const durationPresets = [1, 7, 30, 90, 180, 365];
 
+  const { theme, toggleTheme } = useTheme();
+
   return (
     <div className="home-body">
       {/* Navigation */}
@@ -134,6 +138,17 @@ const Home: React.FC = () => {
             >
               Start Free Analysis
             </NavigationButton>
+            <button
+            onClick={toggleTheme}
+            className="theme-toggle"
+            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+          >
+            {theme === 'light' ? (
+              <span className="theme-icon">🌙</span>
+            ) : (
+              <span className="theme-icon">☀️</span>
+            )}
+          </button>
           </div>
         </div>
       </nav>

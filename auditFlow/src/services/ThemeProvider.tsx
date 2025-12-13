@@ -35,24 +35,13 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   const applyTheme = (theme: Theme) => {
     const root = document.documentElement;
     
+    // Only toggle classes, don't set inline styles
     if (theme === 'dark') {
       root.classList.add('dark-theme');
       root.classList.remove('light-theme');
-      root.style.setProperty('--bg-primary', '#0f172a');
-      root.style.setProperty('--bg-secondary', '#1e293b');
-      root.style.setProperty('--bg-card', '#334155');
-      root.style.setProperty('--text-primary', '#f8fafc');
-      root.style.setProperty('--text-secondary', '#cbd5e1');
-      root.style.setProperty('--border-color', '#475569');
     } else {
       root.classList.add('light-theme');
       root.classList.remove('dark-theme');
-      root.style.setProperty('--bg-primary', '#ffffff');
-      root.style.setProperty('--bg-secondary', '#f8fafc');
-      root.style.setProperty('--bg-card', '#ffffff');
-      root.style.setProperty('--text-primary', '#1e293b');
-      root.style.setProperty('--text-secondary', '#64748b');
-      root.style.setProperty('--border-color', '#e2e8f0');
     }
     
     // Save to localStorage

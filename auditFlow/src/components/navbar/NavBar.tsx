@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useWallet } from "../../services/WalletProvider";
+import WalletButton from "../WalletButton";
 import { useTheme } from "../../services/ThemeProvider";
 import "./NavBar.css";
 
 // Import your logo - you may need to adjust the import based on your setup
-import logoImage from "../assets/image.jpg";
+import logoImage from "../../assets/image.jpg";
 
 interface NavBarProps {
   variant?: "landing" | "dashboard";
@@ -16,7 +17,7 @@ const NavBar: React.FC<NavBarProps> = ({
   variant = "landing", 
   showConnectButton = true 
 }) => {
-  const { account, isConnected, connectWallet, disconnectWallet } = useWallet();
+  const { account, isConnected } = useWallet();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -47,21 +48,6 @@ const NavBar: React.FC<NavBarProps> = ({
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
-  const handleConnect = async () => {
-    await connectWallet();
-    // Navigate to dashboard after connecting
-    if (isConnected && variant === "landing") {
-      navigate("/dashboard");
-    }
-  };
-
-  const handleDisconnect = () => {
-    disconnectWallet();
-    setIsUserMenuOpen(false);
-    if (variant === "dashboard") {
-      navigate("/");
-    }
-  };
 
   const formatAddress = (address: string | null) => {
     if (!address) return "";
@@ -93,14 +79,12 @@ const NavBar: React.FC<NavBarProps> = ({
   const navLinks = {
     landing: [
       { path: "/", label: "Home", badge: undefined },
-      { path: "/#features", label: "Features", badge: undefined },
-      { path: "/#pricing", label: "Pricing", badge: undefined },
-      { path: "/#how-it-works", label: "How It Works", badge: undefined },
-      { path: "/stake", label: "Stake", badge: undefined },
+      { path: "/about", label: "About", badge: undefined },
+      { path: "/contact", label: "Contact", badge: undefined },
     ],
     dashboard: [
       { path: "/dashboard", label: "Dashboard", badge: undefined },
-      { path: "/analyze", label: "Analyze", badge: undefined },
+      { path: "/report", label: "Create Report", badge: undefined },
       { path: "/stake", label: "Stake", badge: undefined },
       { path: "/notifications", label: "Notifications", badge: true },
     ]
@@ -176,17 +160,13 @@ const NavBar: React.FC<NavBarProps> = ({
             )}
           </button>
 
+
+
           {/* Wallet Connection */}
           {showConnectButton && (
             <div className="wallet-section">
               {!isConnected ? (
-                <button
-                  onClick={handleConnect}
-                  className="connect-wallet-btn"
-                >
-                  <span className="wallet-icon">🦊</span>
-                  Connect Wallet
-                </button>
+                <WalletButton/>
               ) : (
                 <div className="user-menu-container" ref={userMenuRef}>
                   <button
@@ -239,6 +219,14 @@ const NavBar: React.FC<NavBarProps> = ({
                       {/* Navigation Links */}
                       <div className="dropdown-section">
                         <Link 
+                          to="/report" 
+                          className="dropdown-link"
+                          onClick={() => setIsUserMenuOpen(false)}
+                        >
+                          <span className="link-icon">📊</span>
+                          Create Report
+                        </Link>
+                        <Link 
                           to="/dashboard" 
                           className="dropdown-link"
                           onClick={() => setIsUserMenuOpen(false)}
@@ -263,18 +251,11 @@ const NavBar: React.FC<NavBarProps> = ({
                           Notifications
                           <span className="notification-badge">3</span>
                         </Link>
+                        <WalletButton/>
                       </div>
 
                       {/* Actions Section */}
-                      <div className="dropdown-section">
-                        <button 
-                          className="dropdown-link disconnect"
-                          onClick={handleDisconnect}
-                        >
-                          <span className="link-icon">🚪</span>
-                          Disconnect
-                        </button>
-                      </div>
+                      
                     </div>
                   )}
                 </div>
@@ -299,12 +280,7 @@ const NavBar: React.FC<NavBarProps> = ({
                     </div>
                   </>
                 ) : (
-                  <button
-                    onClick={handleConnect}
-                    className="mobile-connect-btn"
-                  >
-                    Connect Wallet
-                  </button>
+                  <WalletButton/>
                 )}
               </div>
             </div>
@@ -343,16 +319,7 @@ const NavBar: React.FC<NavBarProps> = ({
                     Notifications
                     <span className="mobile-badge">3</span>
                   </Link>
-                  <button
-                    className="mobile-nav-link disconnect"
-                    onClick={() => {
-                      handleDisconnect();
-                      setIsMobileMenuOpen(false);
-                    }}
-                  >
-                    <span className="mobile-link-icon">🚪</span>
-                    Disconnect
-                  </button>
+                   <WalletButton/>
                 </>
               )}
             </div>

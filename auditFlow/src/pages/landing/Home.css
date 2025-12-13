@@ -1,23 +1,4 @@
-/* Home.css - Futuristic AI Theme */
-
-:root {
-  --primary-bg: #ffffff;
-  --secondary-bg: #f8f9fa;
-  --dark-bg: #0a0a0a;
-  --text-primary: #1a1a1a;
-  --text-secondary: #666666;
-  --text-light: #ffffff;
-  --accent-blue: #0066ff;
-  --accent-purple: #8a2be2;
-  --accent-cyan: #00d4ff;
-  --border-color: #e1e1e1;
-  --border-dark: #333333;
-  --card-bg: #ffffff;
-  --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  --shadow-dark: 0 4px 20px rgba(0, 0, 0, 0.3);
-  --gradient-primary: linear-gradient(135deg, #0066ff 0%, #8a2be2 100%);
-  --gradient-futuristic: linear-gradient(135deg, #0066ff 0%, #00d4ff 50%, #8a2be2 100%);
-}
+/* Home.css - Updated with better light mode visibility */
 
 /* Add viewport-friendly font sizes */
 @media (max-width: 360px) {
@@ -72,14 +53,7 @@
   height: auto;
 }
 
-
-/* Reset and Base */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
+/* Home-specific body class */
 .home-body {
   background: var(--primary-bg);
   color: var(--text-primary);
@@ -89,23 +63,9 @@
   transition: background 0.3s ease;
 }
 
-/* Container */
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 2rem;
-  width: 100%;
-}
-
-@media (max-width: 768px) {
-  .container {
-    padding: 0 1rem;
-  }
-}
-
 /* Navigation */
 .home-nav {
-  background: var(--primary-bg);
+  background: var(--navbar-bg);
   border-bottom: 1px solid var(--border-color);
   padding: 1rem 0;
   position: sticky;
@@ -183,7 +143,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(0, 212, 255, 0.1) 0%, transparent 50%);
+  background: radial-gradient(circle at 50% 50%, rgba(0, 102, 255, 0.1) 0%, transparent 50%);
   pointer-events: none;
 }
 
@@ -213,7 +173,7 @@
 
 .hero-highlight {
   color: var(--accent-cyan);
-  text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+  text-shadow: 0 0 20px rgba(0, 102, 255, 0.3);
 }
 
 .hero-description {
@@ -316,6 +276,7 @@
 
 .section-light {
   background: var(--primary-bg);
+  color: var(--text-primary);
   padding: 5rem 0;
 }
 
@@ -388,6 +349,7 @@
 .step-icon {
   font-size: 2.5rem;
   margin-bottom: 1rem;
+  color: var(--accent-cyan);
 }
 
 .step-number {
@@ -431,7 +393,7 @@
   font-size: 1.5rem;
 }
 
-/* Warning Box - Keep your existing warning box styles */
+/* Warning Box */
 .warning-box {
   background: rgba(255, 152, 0, 0.1);
   border: 1px solid #ff9800;
@@ -455,8 +417,9 @@
 }
 
 .warning-content p {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-light);
   line-height: 1.5;
+  opacity: 0.9;
 }
 
 .warning-content strong {
@@ -507,8 +470,8 @@
 
 .tier-card.selected {
   border-color: var(--accent-cyan);
-  background: linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, transparent 100%);
-  box-shadow: 0 8px 30px rgba(0, 212, 255, 0.2);
+  background: linear-gradient(135deg, rgba(0, 102, 204, 0.1) 0%, transparent 100%);
+  box-shadow: 0 8px 30px rgba(0, 102, 204, 0.2);
 }
 
 .tier-name {
@@ -574,6 +537,7 @@
   border-radius: 3px;
   outline: none;
   -webkit-appearance: none;
+  appearance: none;
 }
 
 .duration-slider::-webkit-slider-thumb {
@@ -583,7 +547,7 @@
   background: var(--accent-cyan);
   border-radius: 50%;
   cursor: pointer;
-  border: 3px solid white;
+  border: 3px solid var(--card-bg);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
@@ -641,7 +605,11 @@
 
 .result-card.primary {
   border-color: var(--accent-cyan);
-  background: linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, transparent 100%);
+  background: linear-gradient(135deg, rgba(0, 102, 204, 0.1) 0%, transparent 100%);
+}
+
+.result-card.warning {
+  border-color: #ff9800;
 }
 
 .result-label {
@@ -657,6 +625,10 @@
   font-weight: 800;
   color: var(--text-primary);
   margin-bottom: 0.5rem;
+}
+
+.result-value.penalty {
+  color: #ff9800;
 }
 
 .result-subtext {
@@ -682,13 +654,19 @@
   display: inline-block;
 }
 
-/* Keep your existing timeline styles */
+/* Timeline Visualization */
 .timeline-visualization {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 2rem;
   margin: 2rem 0;
+}
+
+.timeline-visualization h4 {
+  font-size: 1.25rem;
+  margin-bottom: 1.5rem;
+  color: var(--text-primary);
 }
 
 .timeline {
@@ -726,8 +704,8 @@
 }
 
 .timeline-point.end .point-icon {
-  border-color: #10b981;
-  color: #10b981;
+  border-color: var(--accent-green);
+  color: var(--accent-green);
 }
 
 .point-label {
@@ -782,7 +760,7 @@
 .action-note {
   color: var(--text-secondary);
   font-size: 0.875rem;
-  background: rgba(0, 212, 255, 0.1);
+  background: rgba(0, 102, 204, 0.1);
   padding: 0.75rem;
   border-radius: 6px;
   border-left: 3px solid var(--accent-cyan);
@@ -823,6 +801,7 @@
 .benefit-icon {
   font-size: 2.5rem;
   margin-bottom: 1rem;
+  color: var(--accent-cyan);
 }
 
 .benefit-card h3 {
@@ -844,6 +823,7 @@
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 1rem;
+  background: var(--card-bg);
 }
 
 .comparison-table {
@@ -866,7 +846,7 @@
 }
 
 .comparison-table tbody tr:hover {
-  background: rgba(0, 212, 255, 0.05);
+  background: rgba(0, 102, 204, 0.05);
 }
 
 .feature-column {
@@ -881,7 +861,7 @@
 }
 
 .plan-column.featured {
-  background: linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, transparent 100%);
+  background: linear-gradient(135deg, rgba(0, 102, 204, 0.1) 0%, transparent 100%);
   border: 2px solid var(--accent-cyan);
 }
 
@@ -1022,6 +1002,7 @@
 .footer-bottom p {
   opacity: 0.7;
   font-size: 0.9rem;
+  color: var(--text-light);
 }
 
 .footer-social {
@@ -1163,11 +1144,11 @@
 
 /* Futuristic Glow Effects */
 .glow-text {
-  text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+  text-shadow: 0 0 10px rgba(0, 102, 255, 0.5);
 }
 
 .glow-border {
-  box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+  box-shadow: 0 0 20px rgba(0, 102, 255, 0.3);
 }
 
 /* Loading Animation for Futuristic Feel */

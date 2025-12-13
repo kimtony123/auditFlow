@@ -613,4 +613,517 @@
   .tier-selector {
     grid-template-columns: 1fr;
   }
+
+}
+
+/* Stake.css */
+.stake-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.stake-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.stake-header h1 {
+  font-size: 2.5rem;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.subtitle {
+  color: #666;
+  font-size: 1.1rem;
+}
+
+/* Alerts */
+.alert {
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.alert-error {
+  background-color: #ffebee;
+  border: 1px solid #ffcdd2;
+  color: #c62828;
+}
+
+.alert-success {
+  background-color: #e8f5e9;
+  border: 1px solid #c8e6c9;
+  color: #2e7d32;
+}
+
+.alert-icon {
+  font-size: 1.2rem;
+}
+
+/* Stake Container */
+.stake-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+}
+
+@media (max-width: 968px) {
+  .stake-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Current Stake Section */
+.current-stake-section h2,
+.new-stake-section h2 {
+  font-size: 1.5rem;
+  color: #333;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+/* Current Stake Card */
+.current-stake-card,
+.no-stake-card,
+.wallet-info-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.stake-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.tier-badge {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.tier-basic { background: #e0e0e0; color: #333; }
+.tier-premium { background: #4CAF50; color: white; }
+.tier-pro { background: #2196F3; color: white; }
+.tier-enterprise { background: #9C27B0; color: white; }
+
+.stake-status {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.stake-status.active {
+  background: #4CAF50;
+  color: white;
+}
+
+.stake-status.inactive {
+  background: #f0f0f0;
+  color: #666;
+}
+
+/* Stake Details */
+.stake-details {
+  margin: 24px 0;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.label {
+  color: #666;
+  font-weight: 500;
+}
+
+.value {
+  font-weight: 600;
+  color: #333;
+}
+
+/* Action Buttons */
+.stake-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  flex: 1;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-unstake {
+  background: #4CAF50;
+  color: white;
+}
+
+.btn-unstake:hover:not(:disabled) {
+  background: #45a049;
+}
+
+.btn-emergency {
+  background: #ff9800;
+  color: white;
+}
+
+.btn-emergency:hover:not(:disabled) {
+  background: #f57c00;
+}
+
+.btn-stake {
+  background: #2196F3;
+  color: white;
+}
+
+.btn-stake:hover:not(:disabled) {
+  background: #1976D2;
+}
+
+.btn-approve {
+  background: #9C27B0;
+  color: white;
+}
+
+.btn-approve:hover:not(:disabled) {
+  background: #7B1FA2;
+}
+
+/* Penalty Warning */
+.penalty-warning {
+  background: #fff3e0;
+  border: 1px solid #ff9800;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+  color: #e65100;
+  margin-top: 16px;
+  font-size: 0.9rem;
+}
+
+/* No Stake Card */
+.no-stake-card {
+  text-align: center;
+  background: #f9f9f9;
+}
+
+.no-stake-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+}
+
+.no-stake-card h3 {
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.no-stake-card p {
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.current-tier {
+  font-size: 0.9rem;
+}
+
+/* Wallet Info */
+.wallet-info-card h3 {
+  color: #333;
+  margin-bottom: 16px;
+}
+
+.wallet-details {
+  margin-top: 16px;
+}
+
+/* New Stake Section */
+.stake-form {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Tier Selection */
+.tier-selection {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+  .tier-selection {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tier-card {
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: white;
+}
+
+.tier-card:hover:not(.selected) {
+  border-color: #2196F3;
+  transform: translateY(-4px);
+}
+
+.tier-card.selected {
+  border-color: #2196F3;
+  background: #e3f2fd;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2);
+}
+
+.tier-card-header {
+  margin-bottom: 12px;
+}
+
+.tier-card h3 {
+  color: #333;
+  margin-bottom: 8px;
+  font-size: 1.2rem;
+}
+
+.tier-price-range {
+  color: #2196F3;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.tier-description {
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.tier-features {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  font-size: 0.85rem;
+}
+
+.feature-count {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.yield-rate {
+  background: #e3f2fd;
+  color: #1976D2;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+/* Duration Selection */
+.form-section {
+  margin-bottom: 24px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: #333;
+}
+
+.duration-value {
+  color: #2196F3;
+  font-weight: 600;
+}
+
+.duration-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #e0e0e0;
+  outline: none;
+  margin-bottom: 16px;
+}
+
+.duration-slider::-webkit-slider-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #2196F3;
+  cursor: pointer;
+}
+
+.duration-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.preset-btn {
+  padding: 8px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 0.9rem;
+}
+
+.preset-btn:hover:not(.active) {
+  border-color: #2196F3;
+  color: #2196F3;
+}
+
+.preset-btn.active {
+  background: #2196F3;
+  color: white;
+  border-color: #2196F3;
+}
+
+/* Stake Summary */
+.stake-summary {
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.summary-header {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+  font-size: 1.1rem;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.summary-row .amount {
+  font-weight: 600;
+  color: #333;
+}
+
+.summary-row .amount.sufficient {
+  color: #4CAF50;
+}
+
+.summary-row .amount.insufficient {
+  color: #f44336;
+}
+
+.balance-warning {
+  background: #ffebee;
+  border: 1px solid #ffcdd2;
+  border-radius: 6px;
+  padding: 12px;
+  color: #c62828;
+  text-align: center;
+  margin-top: 12px;
+  font-size: 0.9rem;
+}
+
+/* Action Buttons */
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stake-info {
+  background: #e8f5e9;
+  border: 1px solid #c8e6c9;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 24px;
+  font-size: 0.9rem;
+  color: #2e7d32;
+}
+
+.stake-info p {
+  margin: 8px 0;
+}
+
+.stake-info p:last-child {
+  color: #e65100;
+  background: #fff3e0;
+  padding: 8px;
+  border-radius: 4px;
+  margin-top: 12px;
+}
+
+/* Network Warning */
+.network-warning {
+  text-align: center;
+  padding: 60px 20px;
+  background: #fff3e0;
+  border-radius: 12px;
+  border: 2px solid #ff9800;
+}
+
+.network-warning h2 {
+  color: #e65100;
+  margin-bottom: 16px;
+}
+
+.network-warning p {
+  color: #666;
+  font-size: 1.1rem;
+}
+
+/* Connect Prompt */
+.connect-prompt {
+  text-align: center;
+  padding: 40px;
+  background: #f5f5f5;
+  border-radius: 12px;
+  margin-top: 20px;
+}
+
+.connect-prompt p {
+  color: #666;
+  font-size: 1.1rem;
+  margin-bottom: 20px;
 }

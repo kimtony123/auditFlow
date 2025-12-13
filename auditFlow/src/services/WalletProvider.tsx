@@ -1,138 +1,226 @@
+// services/WalletProvider.tsx
 import { createContext, type ReactNode, useEffect, useState, useContext } from 'react';
 import { ethers } from 'ethers';
-import { 
-  getEthereumProvider, 
+import {
+  getProvider,
   getCurrentAccount,
-  setupWalletListeners 
+  isWalletInstalled,
+  connectWallet,
+  disconnectWallet,
+  switchToLiskSepolia,
+  isOnLiskSepolia,
+  setupWalletListeners,
+  formatAddress
 } from '../utils/connectionUtils';
 
 interface WalletContextProps {
   provider: ethers.BrowserProvider | null;
   account: string | null;
-  chainId: bigint | null;
-  connectWallet: () => Promise<void>;
-  disconnectWallet: () => void;
+  formattedAddress: string;
   isConnected: boolean;
-  error: string | null;
+  isOnLisk: boolean;
   loading: boolean;
+  connect: () => Promise<void>;
+  disconnect: () => void;
+  getSigner: () => Promise<ethers.JsonRpcSigner | null>;
+  switchToLisk: () => Promise<boolean>;
+  error: string | null;
 }
 
 export const WalletContext = createContext<WalletContextProps>({
   provider: null,
   account: null,
-  chainId: null,
-  connectWallet: async () => {},
-  disconnectWallet: () => {},
+  formattedAddress: '',
   isConnected: false,
-  error: null,
+  isOnLisk: false,
   loading: false,
+  connect: async () => {},
+  disconnect: () => {},
+  getSigner: async () => null,
+  switchToLisk: async () => false,
+  error: null,
 });
 
 interface WalletProviderProps {
   children: ReactNode;
 }
 
-// Create a custom hook that safely tries to use UserTypeContext
-const useUserTypeSafe = () => {
-  try {
-    // Dynamic import to avoid circular dependency
-    const { useUserType } = require('../context/UserTypeContext');
-    return useUserType();
-  } catch (error) {
-    // Return fallback functions if UserTypeContext is not available
-    console.warn('UserTypeContext not available, using fallback functions');
-    return {
-      checkUserTierFromBlockchain: async () => {},
-      resetUser: () => {},
-      userTier: 'guest' as const,
-      setUserTier: () => {},
-      stakedAmount: 0,
-      setStakedAmount: () => {},
-      stakingEndDate: null,
-      setStakingEndDate: () => {},
-      isStakingActive: false,
-      hasFeatureAccess: () => false
-    };
-  }
-};
-
 const WalletProvider = ({ children }: WalletProviderProps) => {
-  const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null);
   const [account, setAccount] = useState<string | null>(null);
-  const [chainId, setChainId] = useState<bigint | null>(null);
+  const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null);
+  const [isOnLisk, setIsOnLisk] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
-  
-  // Use the safe hook
-  const { checkUserTierFromBlockchain, resetUser } = useUserTypeSafe();
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  const connectWallet = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  // Create provider instance
+  const createEthersProvider = () => {
+    if (window.ethereum) {
+      return new ethers.BrowserProvider(window.ethereum);
+    }
+    return null;
+  };
 
-      const ethereum = getEthereumProvider();
-      if (!ethereum) {
-        throw new Error('Please install MetaMask or another Web3 wallet!');
-      }
-
-      const browserProvider = new ethers.BrowserProvider(ethereum);
-      const accounts = await ethereum.request({ 
-        method: 'eth_requestAccounts' 
-      });
+  // Update account and provider
+  const updateAccount = async (newAccount: string | null) => {
+    setAccount(newAccount);
+    
+    if (newAccount) {
+      localStorage.setItem('lastConnectedAccount', newAccount);
       
-      const network = await browserProvider.getNetwork();
+      // Create provider if not exists
+      if (!provider) {
+        const ethersProvider = createEthersProvider();
+        setProvider(ethersProvider);
+      }
+      
+      // Check if on Lisk
+      const onLisk = await isOnLiskSepolia();
+      setIsOnLisk(onLisk);
+    } else {
+      localStorage.removeItem('lastConnectedAccount');
+    }
+  };
 
-      setProvider(browserProvider);
-      setAccount(accounts[0]);
-      setChainId(network.chainId);
-
-      // Only check tier if the function exists
-      if (checkUserTierFromBlockchain && typeof checkUserTierFromBlockchain === 'function') {
-        await checkUserTierFromBlockchain(accounts[0], browserProvider);
+  // Initialize wallet connection
+  useEffect(() => {
+    const initializeWallet = async () => {
+      if (!isWalletInstalled()) {
+        setIsInitializing(false);
+        return;
       }
 
-      localStorage.setItem('lastConnectedAccount', accounts[0]);
+      try {
+        // Check for existing connection
+        const existingAccount = await getCurrentAccount();
+        if (existingAccount) {
+          await updateAccount(existingAccount);
+          console.log('Reconnected to wallet:', existingAccount);
+        }
+        
+        // Set up listeners
+        const cleanup = setupWalletListeners(
+          async (accounts) => {
+            if (accounts.length === 0) {
+              await updateAccount(null);
+            } else {
+              await updateAccount(accounts[0]);
+            }
+          },
+          async (chainId) => {
+            setIsOnLisk(chainId === '0x106A');
+          }
+        );
+        
+        return cleanup;
+      } catch (err) {
+        console.error('Error initializing wallet:', err);
+      } finally {
+        setIsInitializing(false);
+      }
+    };
 
+    const cleanupPromise = initializeWallet();
+    
+    return () => {
+      cleanupPromise.then(cleanup => cleanup && cleanup());
+    };
+  }, []);
+
+  // Handle wallet connection
+  const handleConnect = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Connect wallet
+      const connectedAccount = await connectWallet();
+      
+      if (!connectedAccount) {
+        throw new Error('Failed to connect wallet');
+      }
+      
+      await updateAccount(connectedAccount);
+      
+      // Switch to Lisk Sepolia
+      const switched = await switchToLiskSepolia();
+      if (switched) {
+        setIsOnLisk(true);
+      }
+      
     } catch (err: any) {
       setError(err.message || 'Failed to connect wallet');
-      console.error('Wallet connection error:', err);
+      setTimeout(() => setError(null), 5000);
     } finally {
       setLoading(false);
     }
   };
 
-  const disconnectWallet = () => {
-    setProvider(null);
+  // Handle wallet disconnection
+  const handleDisconnect = () => {
+    disconnectWallet();
     setAccount(null);
-    setChainId(null);
-    
-    // Only call resetUser if it exists
-    if (resetUser && typeof resetUser === 'function') {
-      resetUser();
-    }
-    
-    localStorage.removeItem('lastConnectedAccount');
+    setProvider(null);
+    setIsOnLisk(false);
   };
 
-  // ... rest of your useEffect and other functions remain the same
+  // Get signer instance
+  const handleGetSigner = async (): Promise<ethers.JsonRpcSigner | null> => {
+    if (!window.ethereum || !account) return null;
+    
+    try {
+      const ethersProvider = new ethers.BrowserProvider(window.ethereum);
+      return await ethersProvider.getSigner();
+    } catch (error) {
+      console.error('Error getting signer:', error);
+      return null;
+    }
+  };
+
+  // Switch to Lisk Sepolia
+  const handleSwitchToLisk = async (): Promise<boolean> => {
+    try {
+      const switched = await switchToLiskSepolia();
+      if (switched) {
+        setIsOnLisk(true);
+      }
+      return switched;
+    } catch (error) {
+      console.error('Error switching to Lisk:', error);
+      return false;
+    }
+  };
+
+  // Loading state
+  if (isInitializing) {
+    return (
+      <div className="wallet-loading">
+        <div className="spinner"></div>
+        <p>Initializing wallet...</p>
+      </div>
+    );
+  }
 
   return (
     <WalletContext.Provider value={{
       provider,
       account,
-      chainId,
-      connectWallet,
-      disconnectWallet,
+      formattedAddress: formatAddress(account),
       isConnected: !!account,
-      error,
+      isOnLisk,
       loading,
+      connect: handleConnect,
+      disconnect: handleDisconnect,
+      getSigner: handleGetSigner,
+      switchToLisk: handleSwitchToLisk,
+      error,
     }}>
       {children}
     </WalletContext.Provider>
   );
 };
 
+// Custom hook
 export const useWallet = () => {
   const context = useContext(WalletContext);
   if (!context) {
@@ -142,3 +230,28 @@ export const useWallet = () => {
 };
 
 export default WalletProvider;
+
+// CSS styles for the loading state
+const styles = `
+.wallet-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  gap: 16px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+`;

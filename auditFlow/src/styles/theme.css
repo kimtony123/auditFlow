@@ -1,30 +1,95 @@
-/* styles/theme.css */
+/* styles/theme.css - Unified Theme System */
 :root {
-  /* Light theme variables (default) */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-card: #ffffff;
-  --text-primary: #1e293b;
-  --text-secondary: #64748b;
-  --border-color: #e2e8f0;
-  --accent-blue: #4A90E2;
-  --success-green: #10b981;
-  --warning-orange: #f59e0b;
-  --error-red: #ef4444;
+  /* Light Theme Defaults */
+  --primary-bg: #ffffff;
+  --secondary-bg: #f8f9fa;
+  --dark-bg: #0a0a0a;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --text-light: #ffffff;
+  --accent-blue: #0066ff;
+  --accent-purple: #8a2be2;
+  --accent-cyan: #0066cc; /* Changed from light blue to darker for light mode */
+  --accent-red: #e53e3e;
+  --accent-green: #38a169;
+  --border-color: #e1e1e1;
+  --border-dark: #333333;
+  --card-bg: #ffffff;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --shadow-dark: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --gradient-primary: linear-gradient(135deg, #0066ff 0%, #8a2be2 100%);
+  --gradient-futuristic: linear-gradient(135deg, #0066ff 0%, #0066cc 50%, #8a2be2 100%);
+  
+   --hover-light: #edf2f7;
+  --hover-dark: #2d3748;
+  --gradient-futuristic: linear-gradient(135deg, #0066ff 0%, #0066cc 50%, #8a2be2 100%); /* Already exists */
+  
+  /* Add these if missing in your current file: */
+  --secondary-bg: #f8f9fa; /* Already exists */
+  --card-bg: #ffffff; /* Already exists */
+  --border-color: #e1e1e1; /* Already exists */
 }
 
+/* Dark Theme Overrides */
 .dark-theme {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-card: #334155;
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --border-color: #475569;
+  --primary-bg: #0a0a0a;
+  --secondary-bg: #1a1a1a;
+  --dark-bg: #000000;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --text-light: #ffffff;
+  --accent-cyan: #00d4ff; /* Brighter cyan for dark mode */
+  --border-color: #333333;
+  --border-dark: #666666;
+  --card-bg: #1a1a1a;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --shadow-dark: 0 4px 20px rgba(0, 0, 0, 0.5);
+  --navbar-bg: #1a1a1a;
+
+  --secondary-bg: #1a1a1a; /* Already exists */
+  --card-bg: #1a1a1a; /* Already exists */
+  --border-color: #333333; /* Already exists */
+  --navbar-bg: #1a1a1a; /* Already exists */
 }
 
-/* Apply theme to body */
+/* Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
 body {
-  background-color: var(--bg-primary);
+  background: var(--primary-bg);
   color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.6;
   transition: background-color 0.3s ease, color 0.3s ease;
+  min-height: 100vh;
+}
+
+/* Ensure full height for app container */
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Common container styles */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 1rem;
+  }
 }

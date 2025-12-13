@@ -6,19 +6,16 @@ import Analyze from "./pages/analyze/Analyze";
 import Stake from "./pages/stake/Stake";
 import Notifications from "./pages/notifications/Notifications";
 import Settings from "./pages/settings/Settings";
-import { UserTypeProvider } from './context/UserTypeContext';
 import WalletProvider from './services/WalletProvider';
 import { ThemeProvider } from './services/ThemeProvider';
+import { UserTypeProvider } from './context/UserTypeContext';
 
 const App: React.FC = () => {
   return (
-    // USER TYPE must come FIRST because WalletProvider depends on it
-    <UserTypeProvider>
-      {/* WALLET comes second because it uses UserTypeContext */}
-      <WalletProvider>
-        {/* THEME comes last (or anywhere after UserType) */}
-        <ThemeProvider>
-          <Router>
+    <Router>
+      <ThemeProvider>
+        <UserTypeProvider>
+          <WalletProvider>
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/dashboard" element={<Dashboard />} />
@@ -27,10 +24,10 @@ const App: React.FC = () => {
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
-          </Router>
-        </ThemeProvider>
-      </WalletProvider>
-    </UserTypeProvider>
+          </WalletProvider>
+        </UserTypeProvider>
+      </ThemeProvider>
+    </Router>
   );
 };
 
