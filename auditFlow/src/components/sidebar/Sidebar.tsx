@@ -1,24 +1,19 @@
-import React, { } from "react";
-import { Link, useLocation } from "react-router-dom";
+import React from "react";
+import { Link } from "react-router-dom";
+import { useUserData } from "../../context/UserDataContext"; // ADD THIS
 import "./Sidebar.css";
 
 interface SidebarProps {
   collapsed?: boolean;
-  userTier?: 'basic' | 'premium' | 'pro' | 'enterprise';
-  userUsage?: {
-    totalAnalyses: number;
-    analysesThisMonth: number;
-    analysesRemaining: number;
-    lastAnalysisDate: string | null;
-  };
+  // REMOVED PROPS: userTier and userUsage
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
-  collapsed = false, 
-  userTier = 'basic',
-  userUsage 
+  collapsed = false
+  // REMOVED: userTier and userUsage props
 }) => {
-  const location = useLocation();
+  
+  const { userTier, usageInfo } = useUserData(); // GET DATA DIRECTLY FROM CONTEXT
 
   const getTierColor = (tier: string) => {
     switch (tier) {
@@ -39,22 +34,11 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="sidebar-divider"></div>
       
       <nav className="sidebar-nav">
-       
-        <Link 
-          to="/analyze" 
-          className={`sidebar-link ${location.pathname === '/analyze' ? 'active' : ''}`}
-        >
-          <span className="sidebar-icon">✨</span>
-          <span className="sidebar-text">New Analysis</span>
-        </Link>
-        
-        
-        <div className="sidebar-divider"></div>
         
         <div className="sidebar-section">
           <h4>Recent Analyses</h4>
           <div className="recent-list">
-            {userUsage?.totalAnalyses ? (
+            {usageInfo?.totalAnalyses ? (
               <>
                 <Link to="/dashboard/analysis/1" className="recent-item">
                   <span className="recent-icon">📄</span>
@@ -88,6 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               {userTier}
             </span>
           </div>
+         
         </div>
       </div>
     </aside>

@@ -63,9 +63,7 @@ const NavBar: React.FC<NavBarProps> = ({
     ],
     dashboard: [
       { path: "/dashboard", label: "Dashboard", badge: undefined },
-      { path: "/report", label: "Create Report", badge: undefined },
       { path: "/stake", label: "Stake", badge: undefined },
-      { path: "/notifications", label: "Notifications", badge: true },
     ]
   };
 
@@ -198,14 +196,6 @@ const NavBar: React.FC<NavBarProps> = ({
                       {/* Navigation Links */}
                       <div className="dropdown-section">
                         <Link 
-                          to="/report" 
-                          className="dropdown-link"
-                          onClick={() => setIsUserMenuOpen(false)}
-                        >
-                          <span className="link-icon">📊</span>
-                          Create Report
-                        </Link>
-                        <Link 
                           to="/dashboard" 
                           className="dropdown-link"
                           onClick={() => setIsUserMenuOpen(false)}
@@ -213,23 +203,16 @@ const NavBar: React.FC<NavBarProps> = ({
                           <span className="link-icon">📊</span>
                           Dashboard
                         </Link>
+
                         <Link 
-                          to="/settings" 
+                          to="/aianalysis" 
                           className="dropdown-link"
                           onClick={() => setIsUserMenuOpen(false)}
                         >
-                          <span className="link-icon">⚙️</span>
-                          Settings
+                          <span className="link-icon">📊</span>
+                          AI Analyis
                         </Link>
-                        <Link 
-                          to="/notifications" 
-                          className="dropdown-link"
-                          onClick={() => setIsUserMenuOpen(false)}
-                        >
-                          <span className="link-icon">🔔</span>
-                          Notifications
-                          <span className="notification-badge">3</span>
-                        </Link>
+                        
                         <WalletButton/>
                       </div>
 

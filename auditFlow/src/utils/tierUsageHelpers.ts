@@ -1,5 +1,5 @@
 // src/utils/tierUsageHelpers.ts
-import type { UserTier } from '../context/UserTypeContext';
+import type { UserTier } from '../context/UserDataContext';
 
 export interface TierLimits {
   summaries: number | 'Unlimited';

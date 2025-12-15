@@ -1,0 +1,83 @@
+/* Add these to your root variables if missing */
+:root {
+  /* Base colors */
+  --primary-bg: #ffffff;
+  --secondary-bg: #f8f9fa;
+  --card-bg: #ffffff;
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --text-light: #ffffff;
+  --border-color: #dee2e6;
+  
+  /* Accent colors */
+  --accent-blue: #0066ff;
+  --accent-red: #e63946;
+  --accent-green: #38a169;
+  --accent-orange: #fd7e14;
+  --accent-cyan: #06b6d4;
+  
+  /* Soft backgrounds for accent colors */
+  --accent-blue-soft: rgba(0, 102, 255, 0.1);
+  --accent-red-soft: rgba(230, 57, 70, 0.1);
+  --accent-green-soft: rgba(56, 161, 105, 0.1);
+  --accent-orange-soft: rgba(253, 126, 20, 0.1);
+  --accent-cyan-soft: rgba(6, 182, 212, 0.1);
+  
+  /* Transparent borders */
+  --accent-blue-transparent: rgba(0, 102, 255, 0.3);
+  --accent-red-transparent: rgba(230, 57, 70, 0.3);
+  --accent-green-transparent: rgba(56, 161, 105, 0.3);
+  --accent-orange-transparent: rgba(253, 126, 20, 0.3);
+  
+  /* Hover states */
+  --hover-light: rgba(0, 0, 0, 0.05);
+  --hover-dark: rgba(255, 255, 255, 0.1);
+  
+  /* Shadows */
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-hover: 0 8px 25px rgba(0, 102, 255, 0.15);
+  
+  /* Gradient */
+  --gradient-futuristic: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.dark-theme {
+  --primary-bg: #121212;
+  --secondary-bg: #1e1e1e;
+  --card-bg: #1e1e1e;
+  --text-primary: #f8f9fa;
+  --text-secondary: #adb5bd;
+  --text-light: #f8f9fa;
+  --border-color: #2d2d2d;
+  
+  /* Accent colors remain the same or adjust for dark theme */
+  --accent-blue: #4dabf7;
+  --accent-red: #ff6b6b;
+  --accent-green: #51cf66;
+  --accent-orange: #ff922b;
+  --accent-cyan: #3bc9db;
+  
+  /* Soft backgrounds with more opacity for dark theme */
+  --accent-blue-soft: rgba(77, 171, 247, 0.2);
+  --accent-red-soft: rgba(255, 107, 107, 0.2);
+  --accent-green-soft: rgba(81, 207, 102, 0.2);
+  --accent-orange-soft: rgba(255, 146, 43, 0.2);
+  --accent-cyan-soft: rgba(59, 201, 219, 0.2);
+  
+  /* Transparent borders for dark theme */
+  --accent-blue-transparent: rgba(77, 171, 247, 0.4);
+  --accent-red-transparent: rgba(255, 107, 107, 0.4);
+  --accent-green-transparent: rgba(81, 207, 102, 0.4);
+  --accent-orange-transparent: rgba(255, 146, 43, 0.4);
+  
+  /* Hover states */
+  --hover-light: rgba(255, 255, 255, 0.1);
+  --hover-dark: rgba(255, 255, 255, 0.15);
+  
+  /* Shadows for dark theme */
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-hover: 0 8px 25px rgba(0, 102, 255, 0.25);
+  
+  /* Gradient for dark theme */
+  --gradient-futuristic: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}

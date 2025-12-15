@@ -665,3 +665,89 @@
   color: #991b1b;
   border: 1px solid #fecaca;
 }
+
+/* dash.css - ADD THESE STYLES */
+.feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border-left: 4px solid #3b82f6;
+}
+
+.feature-item.unavailable {
+  opacity: 0.6;
+  border-left-color: #64748b;
+}
+
+.feature-icon {
+  font-size: 20px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 8px;
+}
+
+.feature-content {
+  flex: 1;
+}
+
+.feature-name {
+  font-weight: 600;
+  color: white;
+  margin-bottom: 4px;
+}
+
+.feature-description {
+  font-size: 14px;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+
+.feature-remaining {
+  font-size: 12px;
+  color: #10b981;
+  font-weight: 500;
+}
+
+.limit-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.feature-limits {
+  margin: 20px 0;
+}
+
+.feature-limits .limit {
+  margin-bottom: 15px;
+}

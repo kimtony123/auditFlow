@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import NavBar from "../components/navbar/NavBar";
 import Sidebar from "../components/sidebar/Sidebar";
 import { useWallet } from "../services/WalletProvider";
+import { useUserData } from "../context/UserDataContext"; // UPDATED IMPORT
 import "./Layout.css";
 import WalletButton from "../components/WalletButton";
 
@@ -24,7 +25,13 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   userUsage 
 }) => {
   const { isConnected } = useWallet();
+  const { userTier: contextUserTier, usageInfo: contextUsageInfo } = useUserData(); // UPDATED: using usageInfo instead of userUsage
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Use props if provided, otherwise use context values
+  // Note: props take precedence over context (for flexibility)
+  const displayUserTier = userTier !== 'basic' ? userTier : contextUserTier;
+  const displayUserUsage = userUsage || contextUsageInfo;
 
   return (
     <div className="dashboard-layout">
@@ -32,10 +39,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       
       <div className="dashboard-content-wrapper">
         <Sidebar 
-          collapsed={sidebarCollapsed}
-          userTier={userTier}
-          userUsage={userUsage}
-        />
+          collapsed={sidebarCollapsed}/>
         
         <main className="dashboard-main-content">
           <div className="main-content-header">

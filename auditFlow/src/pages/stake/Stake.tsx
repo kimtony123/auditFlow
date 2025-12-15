@@ -1,6 +1,7 @@
-// pages/stake/Stake.tsx
+// Stake.tsx - WITH DIVVI INTEGRATION (FIXED)
 import React, { useState, useEffect } from "react";
 import { useWallet } from "../../services/WalletProvider";
+import { useUserData } from "../../context/UserDataContext";
 import Layout from "../../layout/Layout";
 import { 
   LiskTestToken__factory, 
@@ -9,9 +10,9 @@ import {
   STAKING_ADDRESS 
 } from "../../utils/contractHelpers";
 import { ethers } from "ethers";
+import { DivviService } from "../../services/Divvi";
 import "./Stake.css";
 
-// Replace enum with const object and type
 type TierType = 1 | 2 | 3 | 4;
 const Tier = {
   BASIC: 1 as TierType,
@@ -19,9 +20,6 @@ const Tier = {
   PRO: 3 as TierType,
   ENTERPRISE: 4 as TierType
 } as const;
-
-// Type for user tier in Layout
-type UserTierType = 'basic' | 'premium' | 'pro' | 'enterprise';
 
 interface UserStakeInfo {
   hasActiveStake: boolean;
@@ -33,129 +31,57 @@ interface UserStakeInfo {
   daysRemaining: number;
 }
 
-interface TierOption {
-  id: TierType;
-  name: string;
-  description: string;
-  minStake: number;
-  maxStake: number;
-}
-
 const Stake: React.FC = () => {
-  const { account, isConnected, getSigner, isOnLisk } = useWallet();
+  const { account, isConnected, getSigner, isOnLisk, provider: walletProvider } = useWallet();
+  const { 
+    userTier: currentTier, 
+    walletBalance, 
+    tokenAllowance, 
+    stakeInfo, 
+    tierOptions,
+    setWalletBalance,
+    setTokenAllowance,
+   
+    updateAfterStakeAction,
+    refreshUserDataWithProvider
+  } = useUserData();
   
-  // State for user's current stake - properly typed for Layout
-  const [userStake, setUserStake] = useState<UserStakeInfo | null>(null);
-  const [currentTier, setCurrentTier] = useState<UserTierType>('basic');
-  
-  // State for new stake - use TierType
   const [selectedTier, setSelectedTier] = useState<TierType>(Tier.PREMIUM);
   const [stakingDuration, setStakingDuration] = useState<number>(30);
   const [requiredStake, setRequiredStake] = useState<string>("0");
-  
-  // Token info
-  const [walletBalance, setWalletBalance] = useState<string>("0");
-  const [tokenAllowance, setTokenAllowance] = useState<bigint>(0n);
-  
-  // UI state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [tierOptions, setTierOptions] = useState<TierOption[]>([]);
-  
-  // Tier options for UI
-  const tierOptionsData: TierOption[] = [
-    {
-      id: Tier.PREMIUM,
-      name: "Premium",
-      description: "Access 5 premium features",
-      minStake: 100,
-      maxStake: 200
-    },
-    {
-      id: Tier.PRO,
-      name: "Pro",
-      description: "Access 8 professional features",
-      minStake: 500,
-      maxStake: 1000
-    },
-    {
-      id: Tier.ENTERPRISE,
-      name: "Enterprise",
-      description: "Access all 10 features",
-      minStake: 800,
-      maxStake: 1600
-    }
-  ];
+  const [showEmergencyWarning, setShowEmergencyWarning] = useState(false);
+  const [emergencyLoading, setEmergencyLoading] = useState(false);
+  const [allTiers, setAllTiers] = useState<any[]>([]);
+  const [divviEnabled, setDivviEnabled] = useState(false);
+  const [referralStatus, setReferralStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
 
-  // Fetch all user data
   useEffect(() => {
-    const fetchUserData = async () => {
+    setDivviEnabled(DivviService.isConfigured());
+  }, []);
+
+  useEffect(() => {
+    const fetchAllTiers = async () => {
       if (!isConnected || !account || !isOnLisk) return;
 
       try {
         const signer = await getSigner();
         if (!signer) return;
 
-        // Get token balance
-        const tokenContract = LiskTestToken__factory.connect(TOKEN_ADDRESS, signer);
-        const balance = await tokenContract.balanceOf(account);
-        setWalletBalance(ethers.formatUnits(balance, 18));
-
-        // Get allowance
-        const allowance = await tokenContract.allowance(account, STAKING_ADDRESS);
-        setTokenAllowance(allowance);
-
-        // Get staking contract
         const stakingContract = AuditFlowStaking__factory.connect(STAKING_ADDRESS, signer);
-        
-        try {
-          // Get user's tier info
-          const tierInfo = await stakingContract.getMyTierInfo();
-          
-          // Update current tier for UI with proper type
-          const tierMap: Record<number, UserTierType> = {
-            1: "basic",
-            2: "premium", 
-            3: "pro",
-            4: "enterprise"
-          };
-          const tierId = Number(tierInfo.tierId);
-          setCurrentTier(tierMap[tierId] || "basic");
-          
-          // Set user stake info
-          if (tierInfo.hasActiveStake) {
-            setUserStake({
-              hasActiveStake: true,
-              tierId: tierId,
-              amountStaked: tierInfo.stakedAmount,
-              stakedAt: tierInfo.stakeStartTime,
-              unlocksAt: tierInfo.stakeEndTime,
-              accruedYield: tierInfo.accruedYield,
-              daysRemaining: Number(tierInfo.daysRemaining)
-            });
-          } else {
-            setUserStake(null);
-          }
-          
-        } catch (error) {
-          console.warn("Error fetching tier info:", error);
-        }
-
-        // Get all tiers for display
-        const allTiers = await stakingContract.getAllTiers();
-        console.log("All tiers:", allTiers);
+        const tiers = await stakingContract.getAllTiers();
+        setAllTiers(tiers);
         
       } catch (error) {
-        console.error("Error fetching user data:", error);
+        console.error("Error fetching all tiers:", error);
       }
     };
 
-    fetchUserData();
-    setTierOptions(tierOptionsData);
-  }, [isConnected, account, isOnLisk, success]);
+    fetchAllTiers();
+  }, [isConnected, account, isOnLisk]);
 
-  // Calculate required stake when tier or duration changes
   useEffect(() => {
     const calculateStake = async () => {
       if (!isConnected || !account || selectedTier === Tier.BASIC) {
@@ -169,13 +95,11 @@ const Stake: React.FC = () => {
 
         const stakingContract = AuditFlowStaking__factory.connect(STAKING_ADDRESS, signer);
         
-        // Calculate required stake in wei
         const requiredWei = await stakingContract.calculateRequiredStakeByTierId(
           selectedTier,
           stakingDuration
         );
         
-        // Convert to whole tokens for display
         const requiredTokens = ethers.formatUnits(requiredWei, 18);
         setRequiredStake(requiredTokens);
         
@@ -188,7 +112,6 @@ const Stake: React.FC = () => {
     calculateStake();
   }, [selectedTier, stakingDuration, isConnected, account]);
 
-  // Handle token approval
   const handleApproveTokens = async () => {
     if (!isConnected || !account) {
       setError("Please connect wallet");
@@ -197,6 +120,8 @@ const Stake: React.FC = () => {
 
     setLoading(true);
     setError(null);
+    setSuccess(null);
+    setReferralStatus('idle');
 
     try {
       const signer = await getSigner();
@@ -204,14 +129,12 @@ const Stake: React.FC = () => {
 
       const tokenContract = LiskTestToken__factory.connect(TOKEN_ADDRESS, signer);
       
-      // Use infinite approval for better UX
       const infiniteApproval = ethers.MaxUint256;
       const tx = await tokenContract.approve(STAKING_ADDRESS, infiniteApproval);
       
       setSuccess("Approval transaction submitted...");
       await tx.wait();
       
-      // Update allowance
       const newAllowance = await tokenContract.allowance(account, STAKING_ADDRESS);
       setTokenAllowance(newAllowance);
       
@@ -225,54 +148,146 @@ const Stake: React.FC = () => {
     }
   };
 
-  // Handle staking
   const handleStake = async () => {
     if (!isConnected || !account || !isOnLisk) {
       setError("Please connect wallet and switch to Lisk");
       return;
     }
 
-    if (userStake?.hasActiveStake) {
+    if (stakeInfo?.hasActiveStake) {
       setError("You already have an active stake");
       return;
     }
 
     setLoading(true);
     setError(null);
+    setSuccess(null);
+    setReferralStatus('idle');
 
     try {
       const signer = await getSigner();
       if (!signer) throw new Error("No signer available");
 
       const requiredWei = ethers.parseUnits(requiredStake, 18);
-
-      // Check balance
-      const tokenContract = LiskTestToken__factory.connect(TOKEN_ADDRESS, signer);
-      const balance = await tokenContract.balanceOf(account);
+      const balance = ethers.parseUnits(walletBalance, 18);
       
       if (balance < requiredWei) {
         throw new Error(`Insufficient balance. Need ${requiredStake} LTT`);
       }
 
-      // Check allowance
       if (tokenAllowance < requiredWei) {
         throw new Error("Please approve tokens first");
       }
 
-      // Call stake function
       const stakingContract = AuditFlowStaking__factory.connect(STAKING_ADDRESS, signer);
-      const tx = await stakingContract.stake(selectedTier, stakingDuration);
+      
+      let referralTag = '';
+      let hasDivviTag = false;
+      
+      if (divviEnabled) {
+        try {
+          referralTag = DivviService.generateReferralTagFromString(account);
+          if (referralTag && referralTag.length > 0) {
+            hasDivviTag = true;
+            console.log("Divvi referral tag generated:", referralTag.substring(0, 20) + "...");
+          }
+        } catch (error) {
+          console.warn("Divvi tag generation failed, proceeding without referral:", error);
+        }
+      }
+
+      let tx;
+      
+      if (hasDivviTag) {
+        // Get the function signature for stake
+        const stakeTx = await stakingContract.stake.populateTransaction(selectedTier, stakingDuration);
+        const stakeData = stakeTx.data;
+        
+        if (!stakeData) {
+          throw new Error("Failed to get stake transaction data");
+        }
+        
+        const dataWithReferral = stakeData + referralTag.slice(2);
+        const gasEstimate = await signer.estimateGas({
+          to: STAKING_ADDRESS,
+          data: dataWithReferral,
+        });
+        const gasLimit = gasEstimate * 150n / 100n;
+        
+        tx = await signer.sendTransaction({
+          to: STAKING_ADDRESS,
+          data: dataWithReferral,
+          gasLimit: gasLimit,
+        });
+        
+        console.log("Stake transaction sent with Divvi referral tracking");
+      } else {
+        const gasEstimate = await stakingContract.stake.estimateGas(selectedTier, stakingDuration);
+        const gasLimit = gasEstimate * 150n / 100n;
+        
+        tx = await stakingContract.stake(selectedTier, stakingDuration, {
+          gasLimit: gasLimit,
+        });
+        
+        console.log("Stake transaction sent without Divvi");
+      }
       
       setSuccess("Staking transaction submitted...");
       
       const receipt = await tx.wait();
       if (receipt?.status === 1) {
-        setSuccess(`✅ Successfully staked ${requiredStake} LTT for ${stakingDuration} days!`);
+        let successMessage = `✅ Successfully staked ${requiredStake} LTT for ${stakingDuration} days!`;
         
-        // Refresh data after 3 seconds
-        setTimeout(() => {
-          window.location.reload();
-        }, 3000);
+        if (hasDivviTag) {
+          setReferralStatus('pending');
+          try {
+            const chainId = (await signer.provider?.getNetwork())?.chainId || 4202;
+            const referralSubmitted = await DivviService.submitReferralFromStrings(
+              tx.hash,
+              Number(chainId),
+              account
+            );
+           
+            if (referralSubmitted) {
+              setReferralStatus('success');
+              successMessage += ` 🎯`;
+            } else {
+              setReferralStatus('error');
+              successMessage += ` (Referral tracking failed)`;
+            }
+          } catch (error) {
+            console.error("Error submitting to Divvi:", error);
+            setReferralStatus('error');
+            successMessage += ` (Referral submission error)`;
+          }
+        }
+        
+        setSuccess(successMessage);
+        
+        const tierInfo = await stakingContract.getMyTierInfo();
+        
+        if (tierInfo.hasActiveStake) {
+          const newStakeInfo: UserStakeInfo = {
+            hasActiveStake: true,
+            tierId: Number(tierInfo.tierId),
+            amountStaked: tierInfo.stakedAmount,
+            stakedAt: tierInfo.stakeStartTime,
+            unlocksAt: tierInfo.stakeEndTime,
+            accruedYield: tierInfo.accruedYield,
+            daysRemaining: Number(tierInfo.daysRemaining)
+          };
+          
+          const tokenContract = LiskTestToken__factory.connect(TOKEN_ADDRESS, signer);
+          const newBalance = await tokenContract.balanceOf(account);
+          const newBalanceStr = ethers.formatUnits(newBalance, 18);
+          
+          updateAfterStakeAction(account, newStakeInfo, newBalanceStr);
+        }
+        
+        if (walletProvider) {
+          await refreshUserDataWithProvider(walletProvider);
+        }
+        
       } else {
         throw new Error("Transaction failed");
       }
@@ -280,20 +295,22 @@ const Stake: React.FC = () => {
     } catch (error: any) {
       console.error("Staking error:", error);
       setError(error.message || "Failed to stake tokens");
+      setReferralStatus('error');
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle normal unstake
   const handleUnstake = async () => {
-    if (!isConnected || !account || !userStake?.hasActiveStake) {
+    if (!isConnected || !account || !stakeInfo?.hasActiveStake) {
       setError("No active stake found");
       return;
     }
 
     setLoading(true);
     setError(null);
+    setSuccess(null);
+    setReferralStatus('idle');
 
     try {
       const signer = await getSigner();
@@ -301,9 +318,8 @@ const Stake: React.FC = () => {
 
       const stakingContract = AuditFlowStaking__factory.connect(STAKING_ADDRESS, signer);
       
-      // Check if stake is mature
       const currentTime = BigInt(Math.floor(Date.now() / 1000));
-      const isMature = currentTime >= userStake.unlocksAt;
+      const isMature = currentTime >= stakeInfo.unlocksAt;
       
       if (!isMature) {
         setError("Stake is not mature yet. Use emergency unstake (50% penalty)");
@@ -311,13 +327,99 @@ const Stake: React.FC = () => {
         return;
       }
 
-      const tx = await stakingContract.unstake();
+      let referralTag = '';
+      let hasDivviTag = false;
+      
+      if (divviEnabled) {
+        try {
+          referralTag = DivviService.generateReferralTagFromString(account);
+          if (referralTag && referralTag.length > 0) {
+            hasDivviTag = true;
+            console.log("Divvi referral tag generated:", referralTag.substring(0, 20) + "...");
+          }
+        } catch (error) {
+          console.warn("Divvi tag generation failed, proceeding without referral:", error);
+        }
+      }
+
+      let tx;
+      
+      if (hasDivviTag) {
+        // Try to get the function data - use the actual contract call
+        const unstakeTx = await stakingContract.unstake.populateTransaction();
+        const unstakeData = unstakeTx.data;
+        
+        if (!unstakeData) {
+          throw new Error("Failed to get unstake transaction data");
+        }
+        
+        const dataWithReferral = unstakeData + referralTag.slice(2);
+        const gasEstimate = await signer.estimateGas({
+          to: STAKING_ADDRESS,
+          data: dataWithReferral,
+        });
+        const gasLimit = gasEstimate * 150n / 100n;
+        
+        tx = await signer.sendTransaction({
+          to: STAKING_ADDRESS,
+          data: dataWithReferral,
+          gasLimit: gasLimit,
+        });
+        
+        console.log("Unstake transaction sent with Divvi referral tracking");
+      } else {
+        const gasEstimate = await stakingContract.unstake.estimateGas();
+        const gasLimit = gasEstimate * 150n / 100n;
+        
+        tx = await stakingContract.unstake({
+          gasLimit: gasLimit,
+        });
+        
+        console.log("Unstake transaction sent without Divvi");
+      }
+      
       setSuccess("Unstaking transaction submitted...");
       
       const receipt = await tx.wait();
       if (receipt?.status === 1) {
-        setSuccess("✅ Successfully unstaked! Yield sent to DAO.");
-        setTimeout(() => window.location.reload(), 3000);
+        let successMessage = "✅ Successfully unstaked! Yield sent to DAO.";
+        
+        if (hasDivviTag) {
+          setReferralStatus('pending');
+          try {
+            const chainId = (await signer.provider?.getNetwork())?.chainId || 4202;
+            const referralSubmitted = await DivviService.submitReferralFromStrings(
+              tx.hash,
+              Number(chainId),
+              account
+            );
+           
+            if (referralSubmitted) {
+              setReferralStatus('success');
+              successMessage += ` 🎯`;
+            } else {
+              setReferralStatus('error');
+              successMessage += ` (Referral tracking failed)`;
+            }
+          } catch (error) {
+            console.error("Error submitting to Divvi:", error);
+            setReferralStatus('error');
+            successMessage += ` (Referral submission error)`;
+          }
+        }
+        
+        setSuccess(successMessage);
+        
+        updateAfterStakeAction(account, null);
+        
+        const tokenContract = LiskTestToken__factory.connect(TOKEN_ADDRESS, signer);
+        const newBalance = await tokenContract.balanceOf(account);
+        setWalletBalance(ethers.formatUnits(newBalance, 18));
+        
+        if (walletProvider) {
+          await refreshUserDataWithProvider(walletProvider);
+        }
+        
       } else {
         throw new Error("Transaction failed");
       }
@@ -325,48 +427,176 @@ const Stake: React.FC = () => {
     } catch (error: any) {
       console.error("Unstake error:", error);
       setError(error.message || "Failed to unstake");
+      setReferralStatus('error');
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle emergency unstake
   const handleEmergencyUnstake = async () => {
-    if (!isConnected || !account || !userStake?.hasActiveStake) {
+    if (!isConnected || !account || !stakeInfo?.hasActiveStake) {
       setError("No active stake found");
       return;
     }
 
-    // Confirm penalty
-    const penaltyAmount = Number(ethers.formatUnits(userStake.amountStaked, 18)) * 0.5;
-    const confirmed = window.confirm(
-      `⚠️ EMERGENCY UNSTAKE WARNING\n\n` +
-      `You will lose 50% of your staked amount as penalty.\n` +
-      `Penalty: ${penaltyAmount.toFixed(2)} LTT\n` +
-      `You will receive: ${(penaltyAmount).toFixed(2)} LTT\n\n` +
-      `Click OK to confirm emergency unstake.`
-    );
-    
-    if (!confirmed) {
-      return;
-    }
-
-    setLoading(true);
+    setEmergencyLoading(true);
     setError(null);
+    setSuccess(null);
+    setReferralStatus('idle');
 
     try {
       const signer = await getSigner();
       if (!signer) throw new Error("No signer available");
 
       const stakingContract = AuditFlowStaking__factory.connect(STAKING_ADDRESS, signer);
-      const tx = await stakingContract.emergencyUnstake();
+      
+      let referralTag = '';
+      let hasDivviTag = false;
+      
+      if (divviEnabled) {
+        try {
+          referralTag = DivviService.generateReferralTagFromString(account);
+          if (referralTag && referralTag.length > 0) {
+            hasDivviTag = true;
+            console.log("Divvi referral tag generated:", referralTag.substring(0, 20) + "...");
+          }
+        } catch (error) {
+          console.warn("Divvi tag generation failed, proceeding without referral:", error);
+        }
+      }
+
+      let tx;
+      
+      if (hasDivviTag) {
+        // Try different possible function names
+        let emergencyData;
+        
+        try {
+          // Try emergencyUnstake
+          const emergencyTx = await stakingContract.emergencyUnstake.populateTransaction();
+          emergencyData = emergencyTx.data;
+        } catch (error: any) {
+          console.log("emergencyUnstake not found, trying emergencyWithdraw...");
+          try {
+            // Try emergencyWithdraw
+            const emergencyTx = await (stakingContract as any).emergencyWithdraw.populateTransaction();
+            emergencyData = emergencyTx.data;
+          } catch (error: any) {
+            console.log("emergencyWithdraw not found, trying emergencyExit...");
+            try {
+              // Try emergencyExit
+              const emergencyTx = await (stakingContract as any).emergencyExit.populateTransaction();
+              emergencyData = emergencyTx.data;
+            } catch (error: any) {
+              throw new Error("Could not find emergency unstake function. Please check contract ABI.");
+            }
+          }
+        }
+        
+        if (!emergencyData) {
+          throw new Error("Failed to get emergency unstake transaction data");
+        }
+        
+        const dataWithReferral = emergencyData + referralTag.slice(2);
+        const gasEstimate = await signer.estimateGas({
+          to: STAKING_ADDRESS,
+          data: dataWithReferral,
+        });
+        const gasLimit = gasEstimate * 150n / 100n;
+        
+        tx = await signer.sendTransaction({
+          to: STAKING_ADDRESS,
+          data: dataWithReferral,
+          gasLimit: gasLimit,
+        });
+        
+        console.log("Emergency unstake transaction sent with Divvi referral tracking");
+      } else {
+        // Try to call the function directly
+        let gasEstimate;
+        try {
+          gasEstimate = await stakingContract.emergencyUnstake.estimateGas();
+        } catch (error: any) {
+          try {
+            gasEstimate = await (stakingContract as any).emergencyWithdraw.estimateGas();
+          } catch (error: any) {
+            try {
+              gasEstimate = await (stakingContract as any).emergencyExit.estimateGas();
+            } catch (error: any) {
+              throw new Error("Could not find emergency unstake function. Please check contract ABI.");
+            }
+          }
+        }
+        
+        const gasLimit = gasEstimate * 150n / 100n;
+        
+        try {
+          tx = await stakingContract.emergencyUnstake({
+            gasLimit: gasLimit,
+          });
+        } catch (error: any) {
+          try {
+            tx = await (stakingContract as any).emergencyWithdraw({
+              gasLimit: gasLimit,
+            });
+          } catch (error: any) {
+            try {
+              tx = await (stakingContract as any).emergencyExit({
+                gasLimit: gasLimit,
+              });
+            } catch (error: any) {
+              throw new Error("Could not find emergency unstake function. Please check contract ABI.");
+            }
+          }
+        }
+        
+        console.log("Emergency unstake transaction sent without Divvi");
+      }
       
       setSuccess("Emergency unstake transaction submitted...");
       
       const receipt = await tx.wait();
       if (receipt?.status === 1) {
-        setSuccess("✅ Emergency unstake completed (50% penalty applied)");
-        setTimeout(() => window.location.reload(), 3000);
+        let successMessage = "✅ Emergency unstake successful! 50% penalty applied.";
+        
+        if (hasDivviTag) {
+          setReferralStatus('pending');
+          try {
+            const chainId = (await signer.provider?.getNetwork())?.chainId || 4202;
+            const referralSubmitted = await DivviService.submitReferralFromStrings(
+              tx.hash,
+              Number(chainId),
+              account
+            );
+           
+            if (referralSubmitted) {
+              setReferralStatus('success');
+              successMessage += ` 🎯`;
+            } else {
+              setReferralStatus('error');
+              successMessage += ` (Referral tracking failed)`;
+            }
+          } catch (error) {
+            console.error("Error submitting to Divvi:", error);
+            setReferralStatus('error');
+            successMessage += ` (Referral submission error)`;
+          }
+        }
+        
+        setSuccess(successMessage);
+        
+        updateAfterStakeAction(account, null);
+        
+        const tokenContract = LiskTestToken__factory.connect(TOKEN_ADDRESS, signer);
+        const newBalance = await tokenContract.balanceOf(account);
+        setWalletBalance(ethers.formatUnits(newBalance, 18));
+        
+        if (walletProvider) {
+          await refreshUserDataWithProvider(walletProvider);
+        }
+        
+        setShowEmergencyWarning(false);
+        
       } else {
         throw new Error("Transaction failed");
       }
@@ -374,17 +604,16 @@ const Stake: React.FC = () => {
     } catch (error: any) {
       console.error("Emergency unstake error:", error);
       setError(error.message || "Failed to emergency unstake");
+      setReferralStatus('error');
     } finally {
-      setLoading(false);
+      setEmergencyLoading(false);
     }
   };
 
-  // Format date for display
   const formatDate = (timestamp: bigint) => {
     return new Date(Number(timestamp) * 1000).toLocaleDateString();
   };
 
-  // Format time remaining
   const formatTimeRemaining = (days: number) => {
     if (days >= 30) {
       const months = Math.floor(days / 30);
@@ -394,21 +623,20 @@ const Stake: React.FC = () => {
     return `${days}d`;
   };
 
-  // Reset messages
   useEffect(() => {
     if (success || error) {
       const timer = setTimeout(() => {
         setSuccess(null);
         setError(null);
+        setReferralStatus('idle');
       }, 5000);
       return () => clearTimeout(timer);
     }
   }, [success, error]);
 
-  // Not connected view
   if (!isConnected) {
     return (
-      <Layout showConnectPrompt={true} userTier={currentTier}>
+      <Layout showConnectPrompt={true}>
         <div className="stake-page">
           <div className="stake-hero">
             <h1>Stake LTT Tokens</h1>
@@ -422,10 +650,9 @@ const Stake: React.FC = () => {
     );
   }
 
-  // Wrong network
   if (!isOnLisk) {
     return (
-      <Layout showConnectPrompt={true} userTier={currentTier}>
+      <Layout showConnectPrompt={true}>
         <div className="stake-page">
           <div className="network-warning">
             <h2>⚠️ Wrong Network</h2>
@@ -437,15 +664,20 @@ const Stake: React.FC = () => {
   }
 
   return (
-    <Layout showConnectPrompt={true} userTier={currentTier}>
+    <Layout showConnectPrompt={true}>
       <div className="stake-page">
-        {/* Header */}
         <div className="stake-header">
           <h1>Staking Dashboard</h1>
           <p className="subtitle">Manage your LTT staking positions</p>
+          
+          <div className="current-tier-banner">
+            <span className="tier-label">Current Tier:</span>
+            <span className={`tier-badge tier-${currentTier}`}>
+              {currentTier.toUpperCase()}
+            </span>
+          </div>
         </div>
 
-        {/* Alerts */}
         {error && (
           <div className="alert alert-error">
             <span className="alert-icon">❌</span>
@@ -461,16 +693,15 @@ const Stake: React.FC = () => {
         )}
 
         <div className="stake-container">
-          {/* Current Stake Section */}
           <div className="current-stake-section">
             <h2>Your Current Position</h2>
             
-            {userStake?.hasActiveStake ? (
+            {stakeInfo?.hasActiveStake ? (
               <div className="current-stake-card">
                 <div className="stake-header-row">
                   <div className="tier-badge">
                     <span className={`tier-${currentTier}`}>
-                      {tierOptions.find(t => t.id === userStake.tierId)?.name || "Unknown"} Tier
+                      {tierOptions.find(t => t.id === stakeInfo.tierId)?.name || "Unknown"} Tier
                     </span>
                   </div>
                   <div className="stake-status active">Active</div>
@@ -480,57 +711,85 @@ const Stake: React.FC = () => {
                   <div className="detail-row">
                     <span className="label">Staked Amount:</span>
                     <span className="value">
-                      {ethers.formatUnits(userStake.amountStaked, 18)} LTT
+                      {ethers.formatUnits(stakeInfo.amountStaked, 18)} LTT
                     </span>
                   </div>
                   
                   <div className="detail-row">
                     <span className="label">Start Date:</span>
                     <span className="value">
-                      {formatDate(userStake.stakedAt)}
+                      {formatDate(stakeInfo.stakedAt)}
                     </span>
                   </div>
                   
                   <div className="detail-row">
                     <span className="label">Maturity Date:</span>
                     <span className="value">
-                      {formatDate(userStake.unlocksAt)}
+                      {formatDate(stakeInfo.unlocksAt)}
                     </span>
                   </div>
                   
                   <div className="detail-row">
                     <span className="label">Time Remaining:</span>
                     <span className="value">
-                      {formatTimeRemaining(userStake.daysRemaining)}
+                      {formatTimeRemaining(stakeInfo.daysRemaining)}
                     </span>
                   </div>
                   
                   <div className="detail-row">
                     <span className="label">Accrued Yield:</span>
                     <span className="value">
-                      {ethers.formatUnits(userStake.accruedYield, 18)} LTT
+                      {ethers.formatUnits(stakeInfo.accruedYield, 18)} LTT
                     </span>
                   </div>
                 </div>
                 
-                {/* Action Buttons */}
                 <div className="stake-actions">
                   <button 
                     onClick={handleUnstake}
                     className="btn btn-unstake"
-                    disabled={loading}
+                    disabled={loading || emergencyLoading}
                   >
-                    {loading ? 'Processing...' : 'Unstake'}
+                    {loading ? 'Processing...' : 'Unstake (No Penalty)'}
                   </button>
                   
                   <button 
-                    onClick={handleEmergencyUnstake}
+                    onClick={() => setShowEmergencyWarning(true)}
                     className="btn btn-emergency"
-                    disabled={loading}
+                    disabled={loading || emergencyLoading}
                   >
-                    {loading ? 'Processing...' : 'Emergency Unstake'}
+                    {emergencyLoading ? 'Processing...' : 'Emergency Unstake'}
                   </button>
                 </div>
+                
+                {showEmergencyWarning && (
+                  <div className="emergency-warning-modal">
+                    <div className="warning-content">
+                      <h3>⚠️ Emergency Unstake Warning</h3>
+                      <p>You will lose 50% of your staked amount as a penalty!</p>
+                      <p>Staked amount: {ethers.formatUnits(stakeInfo.amountStaked, 18)} LTT</p>
+                      <p>Penalty: {ethers.formatUnits(stakeInfo.amountStaked / 2n, 18)} LTT</p>
+                      <p>You will receive: {ethers.formatUnits(stakeInfo.amountStaked / 2n, 18)} LTT</p>
+                      
+                      <div className="warning-actions">
+                        <button 
+                          onClick={handleEmergencyUnstake}
+                          className="btn btn-confirm-emergency"
+                          disabled={emergencyLoading}
+                        >
+                          {emergencyLoading ? 'Processing...' : 'Confirm Emergency Unstake'}
+                        </button>
+                        <button 
+                          onClick={() => setShowEmergencyWarning(false)}
+                          className="btn btn-cancel"
+                          disabled={emergencyLoading}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="penalty-warning">
                   ⚠️ Emergency unstake incurs 50% penalty
@@ -547,7 +806,6 @@ const Stake: React.FC = () => {
               </div>
             )}
             
-            {/* Wallet Info */}
             <div className="wallet-info-card">
               <h3>Wallet Information</h3>
               <div className="wallet-details">
@@ -555,17 +813,26 @@ const Stake: React.FC = () => {
                   <span className="label">Balance:</span>
                   <span className="value">{parseFloat(walletBalance).toFixed(2)} LTT</span>
                 </div>
-      
+                <div className="detail-row">
+                  <span className="label">Current Tier:</span>
+                  <span className={`value tier-${currentTier}`}>
+                    {currentTier.toUpperCase()}
+                  </span>
+                </div>
+                <div className="detail-row">
+                  <span className="label">Status:</span>
+                  <span className={`value ${stakeInfo?.hasActiveStake ? 'active' : 'inactive'}`}>
+                    {stakeInfo?.hasActiveStake ? 'Active Stake' : 'No Active Stake'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* New Stake Section */}
           <div className="new-stake-section">
             <h2>Stake New Tokens</h2>
             
             <div className="stake-form">
-              {/* Tier Selection */}
               <div className="form-section">
                 <label className="form-label">Select Tier</label>
                 <div className="tier-selection">
@@ -573,7 +840,7 @@ const Stake: React.FC = () => {
                     <div
                       key={tier.id}
                       className={`tier-card ${selectedTier === tier.id ? 'selected' : ''}`}
-                      onClick={() => !userStake?.hasActiveStake && setSelectedTier(tier.id)}
+                      onClick={() => !stakeInfo?.hasActiveStake && setSelectedTier(tier.id as TierType)}
                     >
                       <div className="tier-card-header">
                         <h3>{tier.name}</h3>
@@ -593,7 +860,6 @@ const Stake: React.FC = () => {
                 </div>
               </div>
 
-              {/* Duration Selection */}
               <div className="form-section">
                 <label className="form-label">
                   Staking Duration: <span className="duration-value">{stakingDuration} days</span>
@@ -605,7 +871,7 @@ const Stake: React.FC = () => {
                   value={stakingDuration}
                   onChange={(e) => setStakingDuration(parseInt(e.target.value))}
                   className="duration-slider"
-                  disabled={userStake?.hasActiveStake}
+                  disabled={stakeInfo?.hasActiveStake}
                 />
                 <div className="duration-presets">
                   {[7, 30, 90, 180, 365].map(days => (
@@ -613,7 +879,7 @@ const Stake: React.FC = () => {
                       key={days}
                       className={`preset-btn ${stakingDuration === days ? 'active' : ''}`}
                       onClick={() => setStakingDuration(days)}
-                      disabled={userStake?.hasActiveStake}
+                      disabled={stakeInfo?.hasActiveStake}
                     >
                       {days === 365 ? '1 Year' : `${days} Days`}
                     </button>
@@ -621,7 +887,6 @@ const Stake: React.FC = () => {
                 </div>
               </div>
 
-              {/* Stake Summary */}
               <div className="stake-summary">
                 <div className="summary-header">Stake Summary</div>
                 <div className="summary-row">
@@ -642,13 +907,12 @@ const Stake: React.FC = () => {
                 )}
               </div>
 
-              {/* Action Buttons */}
               <div className="action-buttons">
                 {tokenAllowance < ethers.parseUnits(requiredStake || "0", 18) && (
                   <button
                     onClick={handleApproveTokens}
                     className="btn btn-approve"
-                    disabled={loading || userStake?.hasActiveStake}
+                    disabled={loading || stakeInfo?.hasActiveStake}
                   >
                     {loading ? 'Approving...' : 'Approve LTT Tokens'}
                   </button>
@@ -659,13 +923,13 @@ const Stake: React.FC = () => {
                   className="btn btn-stake"
                   disabled={
                     loading ||
-                    userStake?.hasActiveStake ||
+                    stakeInfo?.hasActiveStake ||
                     parseFloat(walletBalance) < parseFloat(requiredStake) ||
                     tokenAllowance < ethers.parseUnits(requiredStake || "0", 18)
                   }
                 >
                   {loading ? 'Processing...' : 
-                   userStake?.hasActiveStake ? 'Already Staked' :
+                   stakeInfo?.hasActiveStake ? 'Already Staked' :
                    parseFloat(walletBalance) < parseFloat(requiredStake) ? 'Insufficient Balance' :
                    tokenAllowance < ethers.parseUnits(requiredStake || "0", 18) ? 'Approve Tokens First' :
                    'Stake Now'}

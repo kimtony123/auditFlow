@@ -1,49 +1,46 @@
-// DashboardHome.tsx
+// DashboardHome.tsx - WITH FEATURES
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ethers } from "ethers";
 import { LiskTestToken__factory, TOKEN_ADDRESS } from "../../utils/contractHelpers";
 import { useWallet } from "../../services/WalletProvider";
-import type { UserTier } from "../../context/UserTypeContext";
+import { useUserData } from "../../context/UserDataContext";
 import { DivviService } from "../../services/Divvi";
-import "./dash.css"
+import "./dash.css";
 
-interface DashboardHomeProps {
-  userTier: UserTier;
-  userUsage: {
-    totalAnalyses: number;
-    analysesThisMonth: number;
-    analysesRemaining: number;
-    lastAnalysisDate: string | null;
-  } | null;
-}
-
-const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) => {
+const DashboardHome: React.FC = () => {
   const { account, isConnected, isOnLisk, getSigner } = useWallet();
+  const { 
+    userTier, 
+    walletBalance, 
+    availableFeatures,
+    userFeatureUsage,
+    getFeatureRemaining,
+    canUseFeature,
+    setWalletBalance,
+    refreshUserDataWithProvider
+  } = useUserData();
+  
   const [mintLoading, setMintLoading] = useState(false);
   const [mintSuccess, setMintSuccess] = useState<string | null>(null);
   const [mintError, setMintError] = useState<string | null>(null);
   const [remainingMints, setRemainingMints] = useState<number>(10);
-  const [tokenBalance, setTokenBalance] = useState<string>("0");
   const [mintedCount, setMintedCount] = useState<number>(0);
   const [networkError, setNetworkError] = useState<string | null>(null);
   const [referralStatus, setReferralStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const [divviEnabled, setDivviEnabled] = useState(false);
 
-  // Check if Divvi is configured
   useEffect(() => {
     setDivviEnabled(DivviService.isConfigured());
   }, []);
 
-  // Fetch user's token info when connected
   useEffect(() => {
-    const fetchTokenInfo = async () => {
+    const fetchMintInfo = async () => {
       if (!isConnected || !account) {
-        resetTokenState();
+        resetMintState();
         return;
       }
 
-      // Check if on Lisk network
       if (!isOnLisk) {
         setNetworkError("Please switch to Lisk Sepolia network to mint tokens");
         return;
@@ -55,38 +52,27 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
         const signer = await getSigner();
         if (!signer) return;
 
-        // Use LiskTestToken__factory (not Token__factory)
         const tokenContract = LiskTestToken__factory.connect(TOKEN_ADDRESS, signer);
         
-        // Get remaining mintable tokens (in whole tokens)
         const remaining = await tokenContract.remainingMintable(account);
         const remainingNumber = Number(remaining);
-        
-        // Calculate how many mint transactions they have left (each mint is 1000 tokens)
         const mintsLeft = Math.floor(remainingNumber / 1000);
         setRemainingMints(mintsLeft);
         
-        // Get how many tokens they've already minted
         const minted = await tokenContract.mintedBy(account);
         const mintedTokens = Number(minted);
         setMintedCount(Math.floor(mintedTokens / 1000));
         
-        // Get token balance
-        const balance = await tokenContract.balanceOf(account);
-        const balanceInTokens = ethers.formatUnits(balance, 18);
-        setTokenBalance(parseFloat(balanceInTokens).toFixed(2));
-        
       } catch (error: any) {
-        console.error("Error fetching token info:", error);
+        console.error("Error fetching mint info:", error);
         if (error.code === -32603) {
           setNetworkError("Network error - please check your wallet connection");
         }
       }
     };
 
-    fetchTokenInfo();
+    fetchMintInfo();
     
-    // Reset mint status after 5 seconds
     if (mintSuccess || mintError) {
       const timer = setTimeout(() => {
         setMintSuccess(null);
@@ -97,9 +83,8 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
     }
   }, [isConnected, account, isOnLisk, mintSuccess, mintError]);
 
-  const resetTokenState = () => {
+  const resetMintState = () => {
     setRemainingMints(10);
-    setTokenBalance("0");
     setMintedCount(0);
     setNetworkError(null);
   };
@@ -131,11 +116,8 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
       if (!signer) throw new Error("No signer available");
 
       const tokenContract = LiskTestToken__factory.connect(TOKEN_ADDRESS, signer);
+      const mintAmount = 1000;
       
-      // Mint 1000 tokens (the contract handles whole tokens)
-      const mintAmount = 1000; // 1000 whole tokens
-      
-      // Check remaining mints again before proceeding
       const remaining = await tokenContract.remainingMintable(account);
       const remainingNumber = Number(remaining);
       const currentMintsLeft = Math.floor(remainingNumber / 1000);
@@ -144,14 +126,12 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
         throw new Error("No mints remaining");
       }
 
-      // Step 1: Generate Divvi referral tag if configured
       let referralTag = '';
       let hasDivviTag = false;
       
       if (divviEnabled) {
         try {
           referralTag = DivviService.generateReferralTagFromString(account);
-;
           if (referralTag && referralTag.length > 0) {
             hasDivviTag = true;
             console.log("Divvi referral tag generated:", referralTag.substring(0, 20) + "...");
@@ -164,21 +144,14 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
       let tx;
       
       if (hasDivviTag) {
-        // Method 1: Mint with Divvi referral tag appended to calldata
         const mintFunction = tokenContract.interface.encodeFunctionData("mint", [mintAmount]);
-        
-        // Append Divvi tag (remove 0x prefix from tag before appending)
         const dataWithReferral = mintFunction + referralTag.slice(2);
-        
-        // Estimate gas for modified transaction
         const gasEstimate = await signer.estimateGas({
           to: TOKEN_ADDRESS,
           data: dataWithReferral,
         });
+        const gasLimit = gasEstimate * 150n / 100n;
         
-        const gasLimit = gasEstimate * 150n / 100n; // Add 50% buffer
-        
-        // Send transaction with Divvi referral data
         tx = await signer.sendTransaction({
           to: TOKEN_ADDRESS,
           data: dataWithReferral,
@@ -187,11 +160,9 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
         
         console.log("Mint transaction sent with Divvi referral tracking");
       } else {
-        // Method 2: Standard mint without Divvi (fallback)
         const gasEstimate = await tokenContract.mint.estimateGas(mintAmount);
         const gasLimit = gasEstimate * 150n / 100n;
         
-        // Send mint transaction
         tx = await tokenContract.mint(mintAmount, {
           gasLimit: gasLimit,
         });
@@ -201,25 +172,20 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
       
       setMintSuccess(`Transaction sent! Hash: ${tx.hash.substring(0, 10)}...`);
       
-      // Wait for transaction confirmation
       const receipt = await tx.wait();
       
       if (receipt && receipt.status === 1) {
         let successMessage = `Successfully minted 1,000 LTT tokens!`;
         
-        // Step 2: Submit referral to Divvi if we used a referral tag
         if (hasDivviTag) {
           setReferralStatus('pending');
-          
           try {
-            // Get chain ID
             const chainId = (await signer.provider?.getNetwork())?.chainId || 4202;
-            
-            // Submit to Divvi
             const referralSubmitted = await DivviService.submitReferralFromStrings(
-          tx.hash,
-          Number(chainId),
-          account); 
+              tx.hash,
+              Number(chainId),
+              account
+            );
            
             if (referralSubmitted) {
               setReferralStatus('success');
@@ -237,19 +203,21 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
         
         setMintSuccess(successMessage);
         
-        // Update remaining mints
         const newRemainingMints = currentMintsLeft - 1;
         setRemainingMints(newRemainingMints);
         
-        // Update minted count
+        const newBalance = await tokenContract.balanceOf(account);
+        const balanceInTokens = ethers.formatUnits(newBalance, 18);
+        setWalletBalance(parseFloat(balanceInTokens).toFixed(2));
+        
         const minted = await tokenContract.mintedBy(account);
         const mintedTokens = Number(minted);
         setMintedCount(Math.floor(mintedTokens / 1000));
         
-        // Update token balance
-        const newBalance = await tokenContract.balanceOf(account);
-        const balanceInTokens = ethers.formatUnits(newBalance, 18);
-        setTokenBalance(parseFloat(balanceInTokens).toFixed(2));
+        if (signer.provider) {
+          await refreshUserDataWithProvider(signer.provider as ethers.BrowserProvider);
+        }
+        
       } else {
         setMintError("Transaction failed");
         setReferralStatus('error');
@@ -257,7 +225,6 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
     } catch (error: any) {
       console.error("Mint error:", error);
       
-      // User-friendly error messages
       if (error.code === 4001 || error.message?.includes("user rejected")) {
         setMintError("Transaction was cancelled");
       } else if (error.message?.includes("Exceeds maximum mint per address")) {
@@ -278,18 +245,23 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
     }
   };
 
-  // Get tier limits
-  const getTierLimits = () => {
-    switch (userTier) {
-      case 'basic': return { summaries: 5, reports: 1 };
-      case 'premium': return { summaries: 15, reports: 10 };
-      case 'pro': return { summaries: 100, reports: 40 };
-      case 'enterprise': return { summaries: 'Unlimited', reports: 'Unlimited' };
-      default: return { summaries: 0, reports: 0 };
-    }
+  const getKeyFeatures = () => {
+    return availableFeatures.filter(feature => 
+      feature.type === 'code_summaries' || 
+      feature.type === 'ai_reports' ||
+      feature.type === 'team_members'
+    );
   };
 
-  const tierLimits = getTierLimits();
+  const keyFeatures = getKeyFeatures();
+
+  const totalAnalyses = userFeatureUsage
+    .filter(u => u.type === 'code_summaries' || u.type === 'ai_reports')
+    .reduce((sum, usage) => sum + usage.used, 0);
+
+  const analysesThisMonth = totalAnalyses;
+
+  
 
   return (
     <div className="dashboard-home">
@@ -312,7 +284,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
           <div className="stat-card">
             <div className="stat-icon">💰</div>
             <div className="stat-content">
-              <div className="stat-value">{tokenBalance}</div>
+              <div className="stat-value">{parseFloat(walletBalance).toFixed(2)}</div>
               <div className="stat-label">LTT Balance</div>
             </div>
           </div>
@@ -325,29 +297,15 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
             </div>
           </div>
           
-          <div className="stat-card">
-            <div className="stat-icon">📊</div>
-            <div className="stat-content">
-              <div className="stat-value">{userUsage?.totalAnalyses || 0}</div>
-              <div className="stat-label">Total Analyses</div>
-            </div>
-          </div>
           
           <div className="stat-card">
             <div className="stat-icon">📈</div>
             <div className="stat-content">
-              <div className="stat-value">{userUsage?.analysesThisMonth || 0}</div>
+              <div className="stat-value">{analysesThisMonth}</div>
               <div className="stat-label">This Month</div>
             </div>
           </div>
-          
-          <div className="stat-card">
-            <div className="stat-icon">⚡</div>
-            <div className="stat-content">
-              <div className="stat-value">{userUsage?.analysesRemaining || 0}</div>
-              <div className="stat-label">Analyses Remaining</div>
-            </div>
-          </div>
+        
           
           <div className="stat-card">
             <div className="stat-icon">🛡️</div>
@@ -362,119 +320,48 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
       <div className="dashboard-grid">
         {/* Token Minting Card */}
         <div className="dashboard-card mint-section">
-          <div className="mint-header">
-            <h2>Get Test Tokens</h2>
-            {!isOnLisk && isConnected && (
-              <span className="network-warning">⚠️ Wrong Network</span>
+          <h2>Mint Test Tokens</h2>
+          <div className="mint-info">
+            <p>Mint 1,000 LTT tokens per transaction</p>
+            <div className="mint-stats">
+              <div className="mint-stat">
+                <span className="stat-label">Minted:</span>
+                <span className="stat-value">{mintedCount * 1000} LTT</span>
+              </div>
+              <div className="mint-stat">
+                <span className="stat-label">Remaining:</span>
+                <span className="stat-value">{remainingMints * 1000} LTT</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mint-actions">
+            <button 
+              onClick={handleMintTokens}
+              className="mint-button"
+              disabled={mintLoading || remainingMints <= 0 || !isConnected || !isOnLisk}
+            >
+              {mintLoading ? 'Minting...' : 'Mint 1,000 LTT'}
+            </button>
+          </div>
+          
+          <div className="mint-messages">
+            {networkError && <div className="error-message">{networkError}</div>}
+            {mintError && <div className="error-message">{mintError}</div>}
+            {mintSuccess && <div className="success-message">{mintSuccess}</div>}
+            {referralStatus === 'pending' && (
+              <div className="info-message">Processing referral...</div>
             )}
-            {divviEnabled && (
-              <span className="referral-badge" title="Divvi referral tracking is enabled">
-                🎯 Divvi Enabled
-              </span>
+            {referralStatus === 'success' && (
+              <div className="success-message">Referral tracked successfully!</div>
+            )}
+            {referralStatus === 'error' && (
+              <div className="error-message">Referral tracking failed</div>
             )}
           </div>
           
-          <div className="mint-info">
-            <p className="mint-description">
-              Mint test tokens to use for staking and accessing premium features. 
-              Each mint gives you 1,000 LTT tokens.
-            </p>
-            
-            <div className="mint-stats">
-              <div className="mint-stat">
-                <span className="mint-stat-label">Total Mints Used:</span>
-                <span className="mint-stat-value">{mintedCount}/10</span>
-              </div>
-              <div className="mint-stat">
-                <span className="mint-stat-label">Mints Remaining:</span>
-                <span className="mint-stat-value">{remainingMints}</span>
-              </div>
-              <div className="mint-stat">
-                <span className="mint-stat-label">Your Balance:</span>
-                <span className="mint-stat-value">{tokenBalance} LTT</span>
-              </div>
-            </div>
-            
-            {networkError && (
-              <div className="alert alert-warning">
-                ⚠️ {networkError}
-              </div>
-            )}
-            
-            {/* Divvi referral status */}
-            {referralStatus === 'pending' && (
-              <div className="alert alert-info">
-                ⏳ Submitting referral tracking to Divvi...
-              </div>
-            )}
-            
-            {referralStatus === 'success' && (
-              <div className="alert alert-success">
-                ✅ Referral tracking submitted to Divvi!
-              </div>
-            )}
-            
-            {referralStatus === 'error' && divviEnabled && (
-              <div className="alert alert-warning">
-                ⚠️ Divvi referral tracking failed, but mint was successful
-              </div>
-            )}
-            
-            {mintSuccess && (
-              <div className="alert alert-success">
-                ✅ {mintSuccess}
-              </div>
-            )}
-            
-            {mintError && (
-              <div className="alert alert-error">
-                ❌ {mintError}
-              </div>
-            )}
-
-            
-            <button 
-              className={`mint-button ${!isConnected || !isOnLisk || remainingMints <= 0 ? 'disabled' : ''}`}
-              onClick={handleMintTokens}
-              disabled={!isConnected || !isOnLisk || remainingMints <= 0 || mintLoading}
-            >
-              {mintLoading ? (
-                <>
-                  <span className="spinner"></span>
-                  Minting...
-                </>
-              ) : !isConnected ? (
-                "Connect Wallet to Mint"
-              ) : !isOnLisk ? (
-                "Switch to Lisk Network"
-              ) : remainingMints <= 0 ? (
-                "Mint Limit Reached"
-              ) : (
-                <>
-                  {divviEnabled ? "🎯 Mint 1,000 LTT + Track" : "Mint 1,000 LTT Tokens"}
-                </>
-              )}
-            </button>
-            
-            <div className="mint-footer">
-              <p className="mint-note">
-                <strong>Note:</strong> You can mint up to 10,000 tokens total (10 mints of 1,000 tokens each).
-                Minting requires a small amount of gas on the Lisk network.
-                {divviEnabled && " Referral tracking via Divvi is enabled."}
-              </p>
-              <div className="mint-requirements">
-                <span className="requirement">✅ Wallet Connected</span>
-                <span className={`requirement ${isOnLisk ? 'valid' : 'invalid'}`}>
-                  {isOnLisk ? '✅ Lisk Network' : '❌ Lisk Network'}
-                </span>
-                <span className={`requirement ${remainingMints > 0 ? 'valid' : 'invalid'}`}>
-                  {remainingMints > 0 ? '✅ Mints Available' : '❌ Mints Available'}
-                </span>
-                <span className={`requirement ${divviEnabled ? 'valid' : 'warning'}`}>
-                  {divviEnabled ? '✅ Divvi Enabled' : '⚠️ Divvi Not Configured'}
-                </span>
-              </div>
-            </div>
+          <div className="mint-note">
+            <p>Max 10,000 LTT per address • Lisk Sepolia only • Test tokens only</p>
           </div>
         </div>
 
@@ -482,7 +369,11 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
         <div className="dashboard-card">
           <h2>Quick Actions</h2>
           <div className="action-buttons">
-            <Link to="/analyze" className="action-button primary">
+            <Link 
+              to="/aianalysis" 
+              className={`action-button primary ${!canUseFeature('code_summaries') ? 'disabled' : ''}`}
+              title={!canUseFeature('code_summaries') ? "No analyses remaining this month" : ""}
+            >
               <span className="action-icon">✨</span>
               <span className="action-text">New Analysis</span>
             </Link>
@@ -497,9 +388,9 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
           </div>
         </div>
 
-        {/* Tier Information */}
+        {/* Tier & Features Information */}
         <div className="dashboard-card">
-          <h2>Your Plan</h2>
+          <h2>Your Plan & Features</h2>
           <div className="plan-details">
             <div className="plan-tier">
               <span className="tier-label">Current Tier:</span>
@@ -507,48 +398,78 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ userTier, userUsage }) =>
                 {userTier.charAt(0).toUpperCase() + userTier.slice(1)}
               </span>
             </div>
-            <div className="plan-limits">
-              <div className="limit">
-                <span className="limit-label">Code Summaries:</span>
-                <span className="limit-value">{tierLimits.summaries}/month</span>
-              </div>
-              <div className="limit">
-                <span className="limit-label">AI Reports:</span>
-                <span className="limit-value">{tierLimits.reports}/month</span>
-              </div>
-              <div className="limit">
-                <span className="limit-label">Remaining:</span>
-                <span className="limit-value">{userUsage?.analysesRemaining || 0}</span>
-              </div>
+            
+            <div className="feature-limits">
+              <h4>Monthly Limits</h4>
+              {keyFeatures.map(feature => {
+                const usage = userFeatureUsage.find(u => u.type === feature.type);
+                const remaining = getFeatureRemaining(feature.type);
+                const limit = feature.limit || usage?.limit || 0;
+                
+                return (
+                  <div key={feature.type} className="limit">
+                    <span className="limit-label">{feature.name}:</span>
+                    <div className="limit-progress">
+                      <div className="progress-bar">
+                        <div 
+                          className="progress-fill"
+                          style={{ 
+                            width: `${limit > 0 ? ((limit - remaining) / limit) * 100 : 0}%` 
+                          }}
+                        ></div>
+                      </div>
+                      <span className="limit-value">
+                        {limit > 0 ? `${limit - remaining}/${limit}` : 'Unlimited'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+            
             <Link to="/stake" className="upgrade-link">
               {userTier === 'enterprise' ? 'Manage Plan' : 'Upgrade Tier'}
             </Link>
           </div>
         </div>
 
+        {/* Available Features */}
+        <div className="dashboard-card">
+          <h2>Available Features</h2>
+          <div className="feature-list">
+            {availableFeatures.map(feature => (
+              <div key={feature.id} className="feature-item">
+                <div className="feature-icon">
+                  {feature.type.includes('summary') ? '📄' : 
+                   feature.type.includes('report') ? '📋' : 
+                   feature.type.includes('team') ? '👥' : 
+                   feature.type.includes('support') ? '🆘' : 
+                   feature.type.includes('api') ? '🔌' : '✨'}
+                </div>
+                <div className="feature-content">
+                  <div className="feature-name">{feature.name}</div>
+                  <div className="feature-description">{feature.description}</div>
+                  {feature.limit && (
+                    <div className="feature-remaining">
+                      Remaining: {getFeatureRemaining(feature.type)}/{feature.limit}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Recent Activity */}
         <div className="dashboard-card">
           <h2>Recent Activity</h2>
-          {userUsage?.lastAnalysisDate ? (
-            <div className="activity-list">
-              <div className="activity-item">
-                <div className="activity-icon">📄</div>
-                <div className="activity-content">
-                  <div className="activity-title">Analysis Completed</div>
-                  <div className="activity-date">{userUsage.lastAnalysisDate}</div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="no-activity">
-              <span className="no-activity-icon">📭</span>
-              <p className="no-activity-text">No recent activity</p>
-              <Link to="/analyze" className="start-analysis-btn">
-                Start Your First Analysis
-              </Link>
-            </div>
-          )}
+          <div className="no-activity">
+            <span className="no-activity-icon">📭</span>
+            <p className="no-activity-text">No recent activity</p>
+            <Link to="/aianalysis" className="start-analysis-btn">
+              Start Your First Analysis
+            </Link>
+          </div>
         </div>
       </div>
     </div>
