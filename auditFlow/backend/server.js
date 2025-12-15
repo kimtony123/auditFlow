@@ -13,7 +13,7 @@ const openrouter = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
   apiKey: process.env.OPENROUTER_API_KEY,
   defaultHeaders: {
-    "HTTP-Referer": "http://localhost:3001",
+    "HTTP-Referer": "https://audit-flow-three.vercel.app", // UPDATED: Changed from localhost to your Vercel URL
     "X-Title": "Smart Contract Auditor",
   },
 });
@@ -75,7 +75,7 @@ const getUserUsageStmt = db.prepare(`
 
 // ========== MIDDLEWARE ==========
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000'],
+  origin: ['http://localhost:5173', 'http://localhost:3000', 'https://audit-flow-three.vercel.app'], // UPDATED: Added your Vercel URL
   credentials: true
 }));
 app.use(express.json());
