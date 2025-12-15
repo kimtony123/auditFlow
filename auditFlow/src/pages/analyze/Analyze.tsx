@@ -171,7 +171,7 @@ const Analyze: React.FC = () => {
     
     try {
       // Submit analysis request
-      const response = await fetch('/api/analyze/repo', {
+      const response = await fetch('https://auditflow-e16i.onrender.com/api/analyze/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

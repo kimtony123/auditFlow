@@ -163,7 +163,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   try {
     // UPDATED: Call our new backend API (running on port 3001)
-    const response = await fetch('http://localhost:3001/api/analyze', {
+    const response = await fetch('https://auditflow-e16i.onrender.com/api/analyze/', {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
