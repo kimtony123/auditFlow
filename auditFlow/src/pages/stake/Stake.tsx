@@ -12,6 +12,8 @@ import {
 import { ethers } from "ethers";
 import { DivviService } from "../../services/Divvi";
 import "./Stake.css";
+import { useNavigate } from "react-router-dom";
+
 
 type TierType = 1 | 2 | 3 | 4;
 const Tier = {
@@ -57,6 +59,10 @@ const Stake: React.FC = () => {
   const [allTiers, setAllTiers] = useState<any[]>([]);
   const [divviEnabled, setDivviEnabled] = useState(false);
   const [referralStatus, setReferralStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+
+
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     setDivviEnabled(DivviService.isConfigured());
@@ -282,6 +288,7 @@ const Stake: React.FC = () => {
           const newBalanceStr = ethers.formatUnits(newBalance, 18);
           
           updateAfterStakeAction(account, newStakeInfo, newBalanceStr);
+          navigate(`/aianalysis`);
         }
         
         if (walletProvider) {
