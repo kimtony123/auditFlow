@@ -205,6 +205,15 @@ const NavBar: React.FC<NavBarProps> = ({
                         </Link>
 
                         <Link 
+                          to="/report" 
+                          className="dropdown-link"
+                          onClick={() => setIsUserMenuOpen(false)}
+                        >
+                          <span className="link-icon">📊</span>
+                          Create Scope Doc.
+                        </Link>
+
+                        <Link 
                           to="/aianalysis" 
                           className="dropdown-link"
                           onClick={() => setIsUserMenuOpen(false)}

@@ -8,6 +8,7 @@ import Stake from "./pages/stake/Stake";
 import Notifications from "./pages/notifications/Notifications";
 import Settings from "./pages/settings/Settings";
 import AiAnalysis from "./pages/dashboard/newAnalysis/NewAnalysis";
+import CreateReport from "./pages/report/CreateReport";
 import WalletProvider from './services/WalletProvider';
 import { ThemeProvider } from './services/ThemeProvider';
 import { UserDataProvider } from './context/UserDataContext'; // CHANGED IMPORT
@@ -27,6 +28,8 @@ const App: React.FC = () => {
                 <Route path="/analyze" element={<Analyze />} />
                 <Route path="/aianalysis" element={<AiAnalysis />} />
                 <Route path="/results" element={<AnalysisResults />} />
+                <Route path="/report" element={<CreateReport />} />
+
 
                 <Route path="/stake" element={<Stake />} />
                 <Route path="/notifications" element={<Notifications />} />
