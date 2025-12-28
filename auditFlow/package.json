@@ -16,6 +16,8 @@
   },
   "dependencies": {
     "@divvi/referral-sdk": "^2.3.0",
+    "@foundry-rs/foundry-toolchain": "^1.0.8",
+    "@foundryup/foundry": "^0.2.0-nightly.4603195",
     "@prisma/client": "^7.1.0",
     "@react-pdf/renderer": "^4.3.1",
     "@types/csv-parse": "^1.1.12",
@@ -28,6 +30,7 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",
+    "jszip": "^3.10.1",
     "marked": "^17.0.1",
     "openai": "^6.10.0",
     "process": "^0.11.10",

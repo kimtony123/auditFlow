@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import DashboardLayout from "../../../layout/Layout";
 import "./AnalysisResults.css";
 import { usePDFGenerator } from '../../../hooks/usePDFGenerator';
+import JSZip from 'jszip';
 
 interface VulnerabilityCounts {
   high: number;
@@ -76,17 +77,20 @@ const AnalysisResults: React.FC = () => {
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const [parsedAIData, setParsedAIData] = useState<ParsedAIData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'summary' | 'vulnerabilities' | 'code' | 'export'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'vulnerabilities' | 'code' | 'tests' | 'export'>('summary');
   
-  // Use the PDF generator hook
+  // PDF generator hook
   const { generateReport, isGenerating, error } = usePDFGenerator();
+  
+  // Foundry test generation states
+  const [isGeneratingTests, setIsGeneratingTests] = useState(false);
+  const [testGenerationStatus, setTestGenerationStatus] = useState('');
 
   // Parse AI analysis from the backend response
   const parseAIAnalysis = (aiAnalysisString: string): ParsedAIData | null => {
     try {
       console.log('Parsing AI analysis string...');
       
-      // Remove markdown code blocks and whitespace
       const cleanJson = aiAnalysisString
         .replace(/```json\s*/g, '')
         .replace(/```\s*/g, '')
@@ -107,7 +111,6 @@ const AnalysisResults: React.FC = () => {
     } catch (error) {
       console.error('Failed to parse AI analysis:', error);
       
-      // Try to extract JSON from the string if it's wrapped
       try {
         const jsonMatch = aiAnalysisString.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
@@ -123,7 +126,272 @@ const AnalysisResults: React.FC = () => {
     }
   };
 
-  
+  // Foundry test generation function
+  const handleGenerateFoundryTests = async () => {
+    if (!parsedAIData?.vulnerabilities || !analysisData) {
+      alert('No vulnerability data available to generate tests');
+      return;
+    }
+
+    setIsGeneratingTests(true);
+    setTestGenerationStatus('Creating test files...');
+
+    try {
+      const zip = new JSZip();
+      
+      // 1. Create the basic Foundry project structure
+      zip.file("foundry.toml", `[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc_version = "${analysisData.compilerVersion || '0.8.19'}"
+optimizer = true
+optimizer_runs = 200
+
+[fmt]
+line_length = 80
+tab_width = 2
+bracket_spacing = true`);
+
+      // 2. Create README with instructions
+      zip.file("README.md", `# Foundry Tests for ${analysisData.contractName}
+
+Generated from AI Audit Report
+
+## How to Run Tests
+
+1. Install Foundry: \`curl -L https://foundry.paradigm.xyz | bash\`
+2. Run \`foundryup\`
+3. Run tests: \`forge test --vv\`
+
+## Test Coverage
+${parsedAIData.vulnerabilities.length} vulnerabilities converted to test cases
+Generated: ${new Date().toISOString()}
+Contract: ${analysisData.contractAddress}
+Risk Level: ${analysisData.riskLevel}
+`);
+
+      // 3. Create the main test contract
+      const contractNameSafe = analysisData.contractName.replace(/[^a-zA-Z0-9]/g, '_');
+      let testContent = `// SPDX-License-Identifier: MIT
+pragma solidity ${analysisData.compilerVersion || '^0.8.19'};
+
+import "forge-std/Test.sol";
+import "../src/${contractNameSafe}.sol";
+
+contract ${contractNameSafe}AuditTest is Test {
+    ${contractNameSafe} public auditContract;
+    
+    function setUp() public {
+        // Deploy the contract to test
+        auditContract = new ${contractNameSafe}();
+    }
+    
+    // ============================================
+    // GENERATED TESTS FOR DETECTED VULNERABILITIES
+    // ============================================\n\n`;
+
+      // 4. Generate test functions for each vulnerability
+      parsedAIData.vulnerabilities.forEach((vuln, index) => {
+        const testName = `test_Vulnerability_${index + 1}_${vuln.title.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        
+        testContent += `    function ${testName}() public {
+        // Vulnerability: ${vuln.title}
+        // Severity: ${vuln.severity}
+        // Location: ${vuln.location || 'Not specified'}
+        
+        // Test Description: ${vuln.description.substring(0, 100)}...
+        
+        // TODO: Implement specific test for this vulnerability
+        // Recommendation: ${vuln.recommendation.substring(0, 150)}...
+        
+        emit log_string("Testing: ${vuln.title}");
+        
+        // Placeholder assertion - replace with actual vulnerability test
+        assertTrue(true, "Test for ${vuln.title} needs implementation");
+        
+        emit log_string("✓ Test placeholder for ${vuln.severity} severity vulnerability");
+    }\n\n`;
+        
+        // Add specific test templates for common vulnerability types
+        if (vuln.title.toLowerCase().includes('reentrancy')) {
+          testContent += `    function ${testName}_ReentrancySpecific() public {
+        // Reentrancy Guard Test
+        // This test should verify reentrancy protection is in place
+        
+        // Example: Attempt reentrant call and expect revert
+        // vm.expectRevert();
+        // vulnerableFunction();
+        
+        emit log_string("Reentrancy test stub for: ${vuln.title}");
+        assertTrue(true, "Implement reentrancy checks");
+    }\n\n`;
+        }
+        
+        // Add test for overflow vulnerabilities
+        if (vuln.title.toLowerCase().includes('overflow') || vuln.title.toLowerCase().includes('underflow')) {
+          testContent += `    function ${testName}_OverflowProtection() public {
+        // Integer overflow/underflow test
+        // Should verify SafeMath or built-in overflow checks
+        
+        // Example: Test max values
+        // uint256 max = type(uint256).max;
+        // vm.expectRevert();
+        // auditContract.increment(max);
+        
+        emit log_string("Overflow protection test for: ${vuln.title}");
+        assertTrue(true, "Implement overflow checks");
+    }\n\n`;
+        }
+        
+        // Add test for access control vulnerabilities
+        if (vuln.title.toLowerCase().includes('access') || vuln.title.toLowerCase().includes('permission')) {
+          testContent += `    function ${testName}_AccessControl() public {
+        // Access control test
+        // Should verify only authorized addresses can call restricted functions
+        
+        // Example: Test with non-owner address
+        // address attacker = address(0x123);
+        // vm.prank(attacker);
+        // vm.expectRevert();
+        // auditContract.restrictedFunction();
+        
+        emit log_string("Access control test for: ${vuln.title}");
+        assertTrue(true, "Implement access control checks");
+    }\n\n`;
+        }
+      });
+
+      // 5. Add generic security tests
+      testContent += `    // ============================================
+    // GENERIC SECURITY TESTS
+    // ============================================
+    
+    function test_ContractDeploys() public view {
+        // Basic test: contract should deploy successfully
+        assertTrue(address(auditContract).code.length > 0, "Contract should have code");
+    }
+    
+    function test_InitialState() public view {
+        // Test initial contract state
+        // Add assertions based on expected initial state
+    }
+    
+    function test_EventLogging() public {
+        // Test that critical events are properly emitted
+        // vm.expectEmit(true, true, true, true);
+        // emit SomeEvent();
+        // someFunction();
+    }
+    
+    function test_ContractOwnership() public view {
+        // Test contract ownership if applicable
+        // assertEq(auditContract.owner(), expectedOwner);
+    }
+    
+    function test_PausableFunctionality() public {
+        // Test pausable functionality if contract is pausable
+        // Only if contract has pause/unpause functionality
+    }\n`;
+
+      // Close the contract
+      testContent += "}\n";
+
+      // Add the test file to ZIP
+      zip.file(`test/${contractNameSafe}AuditTest.t.sol`, testContent);
+
+      // 6. Create a placeholder contract file
+      zip.file(`src/${contractNameSafe}.sol`, `// SPDX-License-Identifier: MIT
+pragma solidity ${analysisData.compilerVersion || '^0.8.19'};
+
+// IMPORTANT: Replace this with your actual contract code
+// This is a placeholder for the contract being audited
+
+contract ${contractNameSafe} {
+    // Your contract code goes here
+    // The generated tests in /test/ will test this contract
+    
+    string public constant VERSION = "1.0.0";
+    
+    constructor() {
+        // Initialize your contract
+    }
+    
+    // Add your contract functions here
+}`);
+
+      // 7. Create a vulnerabilities summary JSON
+      const vulnerabilitiesSummary = {
+        contract: analysisData.contractName,
+        address: analysisData.contractAddress,
+        auditDate: analysisData.timestamp,
+        riskLevel: analysisData.riskLevel,
+        totalVulnerabilities: parsedAIData.vulnerabilities.length,
+        bySeverity: {
+          high: parsedAIData.vulnerabilities.filter(v => v.severity === 'high').length,
+          medium: parsedAIData.vulnerabilities.filter(v => v.severity === 'medium').length,
+          low: parsedAIData.vulnerabilities.filter(v => v.severity === 'low').length
+        },
+        vulnerabilities: parsedAIData.vulnerabilities.map(v => ({
+          title: v.title,
+          severity: v.severity,
+          location: v.location,
+          description: v.description.substring(0, 200),
+          recommendation: v.recommendation.substring(0, 200)
+        }))
+      };
+      
+      zip.file("vulnerabilities-summary.json", JSON.stringify(vulnerabilitiesSummary, null, 2));
+
+      // 8. Create a script to run tests
+      zip.file("scripts/run-tests.sh", `#!/bin/bash
+echo "Running Foundry tests for ${analysisData.contractName}"
+echo "=========================================="
+
+# Install Foundry if not present
+if ! command -v forge &> /dev/null; then
+    echo "Foundry not found. Installing..."
+    curl -L https://foundry.paradigm.xyz | bash
+    foundryup
+fi
+
+# Run tests
+echo "Running tests..."
+forge test --vv
+
+echo "=========================================="
+echo "Test execution complete!"
+echo "Generated: $(date)"
+echo "Contract: ${analysisData.contractAddress}"
+`);
+
+      // 9. Generate and trigger the ZIP download
+      setTestGenerationStatus('Creating ZIP archive...');
+      
+      const content = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(content);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `foundry-tests-${contractNameSafe}-${Date.now()}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setTestGenerationStatus('✅ Tests generated successfully!');
+      
+      // Show success message
+      setTimeout(() => {
+        setTestGenerationStatus('');
+      }, 3000);
+
+    } catch (error) {
+      console.error('Failed to generate tests:', error);
+      setTestGenerationStatus('❌ Error generating tests');
+    } finally {
+      setIsGeneratingTests(false);
+    }
+  };
 
   // Debug logging
   useEffect(() => {
@@ -140,13 +408,11 @@ const AnalysisResults: React.FC = () => {
     const loadAnalysisData = () => {
       console.log('Loading analysis data...');
       
-      // First, try to get data from location.state (from navigation)
       if (location.state) {
         console.log('Found data in location.state');
         const data = location.state as AnalysisData;
         setAnalysisData(data);
         
-        // Parse the AI analysis data
         if (data.aiAnalysis) {
           const parsed = parseAIAnalysis(data.aiAnalysis);
           setParsedAIData(parsed);
@@ -154,16 +420,13 @@ const AnalysisResults: React.FC = () => {
         
         setIsLoading(false);
         
-        // Also store in sessionStorage as backup
         try {
           sessionStorage.setItem('lastAnalysis', JSON.stringify(data));
           console.log('Data stored in sessionStorage');
         } catch (error) {
           console.error('Failed to store in sessionStorage:', error);
         }
-      } 
-      // If no location state, try sessionStorage
-      else {
+      } else {
         console.log('No location.state, checking sessionStorage...');
         const storedData = sessionStorage.getItem('lastAnalysis');
         
@@ -173,7 +436,6 @@ const AnalysisResults: React.FC = () => {
             const data = JSON.parse(storedData) as AnalysisData;
             setAnalysisData(data);
             
-            // Parse the AI analysis data
             if (data.aiAnalysis) {
               const parsed = parseAIAnalysis(data.aiAnalysis);
               setParsedAIData(parsed);
@@ -206,8 +468,6 @@ const AnalysisResults: React.FC = () => {
       console.log('PDF generated successfully!');
     }
   };
-
- 
 
   const formatTimestamp = (timestamp: string): string => {
     try {
@@ -258,7 +518,6 @@ const AnalysisResults: React.FC = () => {
     
     console.log('Rendering AI analysis content, length:', analysisData.aiAnalysis.length);
     
-    // Try to use parsed data for better display
     if (parsedAIData?.detailedAnalysis) {
       return (
         <>
@@ -282,31 +541,25 @@ const AnalysisResults: React.FC = () => {
       );
     }
     
-    // Fallback to raw text display
     return analysisData.aiAnalysis.split('\n').map((line, index) => {
       const trimmedLine = line.trim();
       
-      // Headings
       if (trimmedLine.match(/^[0-9]+\.\s+.+/) || trimmedLine.match(/^[A-Z][A-Z\s]+:$/)) {
         return <h3 key={index} className="analysis-heading">{trimmedLine}</h3>;
       }
       
-      // Sub-headings
       if (trimmedLine.match(/^[-•*]\s+.+/)) {
         return <li key={index} className="analysis-bullet">{trimmedLine.substring(2)}</li>;
       }
       
-      // Code blocks
       if (trimmedLine.startsWith('```')) {
         return null;
       }
       
-      // Regular paragraphs
       if (trimmedLine) {
         return <p key={index} className="analysis-paragraph">{trimmedLine}</p>;
       }
       
-      // Empty lines
       return <br key={index} />;
     });
   };
@@ -346,7 +599,6 @@ const AnalysisResults: React.FC = () => {
       </DashboardLayout>
     );
   }
-
   
   return (
     <DashboardLayout>
@@ -403,7 +655,7 @@ const AnalysisResults: React.FC = () => {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs - UPDATED WITH TESTS TAB */}
         <div className="results-tabs">
           <button 
             className={`tab ${activeTab === 'summary' ? 'active' : ''}`}
@@ -424,6 +676,12 @@ const AnalysisResults: React.FC = () => {
             📄 Source Code
           </button>
           <button 
+            className={`tab ${activeTab === 'tests' ? 'active' : ''}`}
+            onClick={() => setActiveTab('tests')}
+          >
+            ⚙️ Generate Tests
+          </button>
+          <button 
             className={`tab ${activeTab === 'export' ? 'active' : ''}`}
             onClick={() => setActiveTab('export')}
           >
@@ -431,7 +689,7 @@ const AnalysisResults: React.FC = () => {
           </button>
         </div>
 
-        {/* Tab Content */}
+        {/* Tab Content - UPDATED WITH TESTS TAB CONTENT */}
         <div className="tab-content">
           {/* AI Summary Tab */}
           {activeTab === 'summary' && (
@@ -477,7 +735,7 @@ const AnalysisResults: React.FC = () => {
             </div>
           )}
 
-          {/* Vulnerabilities Tab - UPDATED WITH REAL DATA */}
+          {/* Vulnerabilities Tab */}
           {activeTab === 'vulnerabilities' && (
             <div className="vulnerabilities-tab">
               <div className="vulnerabilities-header">
@@ -598,6 +856,108 @@ const AnalysisResults: React.FC = () => {
             </div>
           )}
 
+          {/* NEW: Generate Tests Tab */}
+          {activeTab === 'tests' && (
+            <div className="tests-tab">
+              <div className="tests-header">
+                <h2>⚙️ Generate Foundry Tests</h2>
+                <p>Convert detected vulnerabilities into executable Solidity tests for the Foundry framework.</p>
+              </div>
+
+              {parsedAIData?.vulnerabilities && parsedAIData.vulnerabilities.length > 0 ? (
+                <div className="tests-content">
+                  <div className="test-generation-info">
+                    <div className="info-card">
+                      <h4>📦 What You'll Get</h4>
+                      <ul>
+                        <li>Complete Foundry project structure</li>
+                        <li>Test file with placeholders for each vulnerability</li>
+                        <li><code>foundry.toml</code> configuration</li>
+                        <li>README with setup instructions</li>
+                        <li>Vulnerabilities summary JSON</li>
+                        <li>Placeholder contract file</li>
+                        <li>Test runner script</li>
+                      </ul>
+                    </div>
+                    
+                    <div className="info-card">
+                      <h4>🚀 How It Works</h4>
+                      <ol>
+                        <li>Download the ZIP file below</li>
+                        <li>Replace placeholder contract with your actual contract</li>
+                        <li>Implement test logic for each vulnerability</li>
+                        <li>Run <code>forge test</code> to verify fixes</li>
+                      </ol>
+                    </div>
+                  </div>
+
+                  <div className="vulnerabilities-summary">
+                    <h4>Vulnerabilities to be Tested ({parsedAIData.vulnerabilities.length})</h4>
+                    <div className="vuln-preview">
+                      {parsedAIData.vulnerabilities.slice(0, 5).map((vuln, index) => (
+                        <div key={index} className="vuln-preview-item">
+                          <span className={`severity-dot ${vuln.severity}`}></span>
+                          <span className="vuln-title">{vuln.title}</span>
+                        </div>
+                      ))}
+                      {parsedAIData.vulnerabilities.length > 5 && (
+                        <div className="vuln-preview-more">
+                          + {parsedAIData.vulnerabilities.length - 5} more vulnerabilities
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="action-section">
+                    <button 
+                      onClick={handleGenerateFoundryTests}
+                      disabled={isGeneratingTests}
+                      className="generate-button"
+                    >
+                      {isGeneratingTests ? (
+                        <>
+                          <span className="spinner small"></span>
+                          Generating Test Package...
+                        </>
+                      ) : (
+                        '📥 Download Foundry Test Suite (.zip)'
+                      )}
+                    </button>
+                    
+                    {testGenerationStatus && (
+                      <div className={`generation-status ${testGenerationStatus.includes('✅') ? 'success' : 
+                        testGenerationStatus.includes('❌') ? 'error' : 'info'}`}>
+                        {testGenerationStatus}
+                      </div>
+                    )}
+                    
+                    <div className="helper-text">
+                      <p><strong>Note:</strong> The generated tests are <em>templates</em>. You need to:</p>
+                      <ol>
+                        <li>Replace the placeholder contract in <code>/src/</code> with your actual contract</li>
+                        <li>Implement the specific test logic for each vulnerability placeholder</li>
+                        <li>Run <code>forge test</code> to verify your fixes work correctly</li>
+                      </ol>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="no-tests-available">
+                  <h4>🎉 No Vulnerabilities Found</h4>
+                  <p>Great news! Since no vulnerabilities were detected, there are no specific tests to generate.</p>
+                  <p>You can still generate a basic Foundry test suite for the contract's main functions.</p>
+                  <button 
+                    onClick={handleGenerateFoundryTests}
+                    disabled={isGeneratingTests}
+                    className="secondary-button"
+                  >
+                    {isGeneratingTests ? 'Generating...' : 'Generate Basic Test Suite'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Export PDF Tab */}
           {activeTab === 'export' && (
             <div className="export-tab">
@@ -660,6 +1020,14 @@ const AnalysisResults: React.FC = () => {
             className="action-button secondary"
           >
             Start New Analysis
+          </button>
+          
+          <button 
+            onClick={handleGenerateFoundryTests}
+            disabled={isGeneratingTests || !parsedAIData?.vulnerabilities?.length}
+            className="action-button primary"
+          >
+            {isGeneratingTests ? 'Generating...' : 'Generate Foundry Tests'}
           </button>
           
           <button 
