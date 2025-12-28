@@ -344,60 +344,53 @@ ANALYSIS INSTRUCTIONS:
 
 RETURN ONLY VALID JSON. No additional text before or after.`;
 
-    // 4. CALL OPENROUTER WITH API-KEY COMPATIBLE MODEL
-    console.log('🤖 Calling OpenRouter AI...');
+    // 4. CALL OPENROUTER WITH DIRECT API CALL (REPLACED OpenAI SDK)
+    console.log('🤖 Calling OpenRouter AI via direct fetch...');
     
-    const availableModels = [
-      'nex-agi/deepseek-v3.1-nex-n1:free',
-    ];
-
     let aiResponse = '';
     let structuredData = null;
-    let lastError = null;
-
-    for (const model of availableModels) {
-      try {
-        console.log(`   Trying model: ${model}`);
-        
-        const completion = await openrouter.chat.completions.create({
-          model: model,
+    
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://audit-flow-three.vercel.app',
+          'X-Title': 'Smart Contract Auditor',
+        },
+        body: JSON.stringify({
+          model: 'nex-agi/deepseek-v3.1-nex-n1:free',
           messages: [
-            { 
-              role: 'system', 
-              content: 'You are a smart contract auditor. Return ONLY valid JSON as specified.' 
-            },
-            { 
-              role: 'user', 
-              content: analysisPrompt 
-            }
+            { role: 'system', content: 'You are a smart contract auditor. Return ONLY valid JSON as specified.' },
+            { role: 'user', content: analysisPrompt }
           ],
           max_tokens: 4000,
           temperature: 0.1,
-        });
+        })
+      });
 
-        aiResponse = completion.choices[0].message.content;
-        console.log(`✅ Success with model: ${model}`);
-        
-        try {
-          structuredData = JSON.parse(aiResponse);
-          break;
-        } catch (parseError) {
-          console.log(`   Failed to parse JSON from ${model}, trying next model...`);
-          continue;
-        }
-        
-      } catch (error) {
-        lastError = error;
-        console.log(`   Model ${model} failed: ${error.message}`);
-        continue;
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        // This will give you the exact error from OpenRouter
+        throw new Error(`OpenRouter API Error (${response.status}): ${responseData.error?.message || JSON.stringify(responseData)}`);
       }
-    }
 
-    if (!structuredData) {
-      structuredData = extractStructureFromText(aiResponse || '');
+      aiResponse = responseData.choices[0].message.content;
+      console.log('✅ AI analysis complete via direct fetch');
+      
+      try {
+        structuredData = JSON.parse(aiResponse);
+      } catch (parseError) {
+        console.log('   Failed to parse JSON from AI response, using fallback...');
+        structuredData = extractStructureFromText(aiResponse || '');
+      }
+      
+    } catch (error) {
+      console.error('❌ Direct fetch call failed:', error);
+      throw error;
     }
-
-    console.log('✅ AI analysis complete');
 
     // 5. ENRICH STRUCTURED DATA WITH CONTRACT INFO
     const riskScore = structuredData.riskScore || calculateAuditScoreFromVulns(structuredData.vulnerabilities);
@@ -591,23 +584,39 @@ app.post('/api/analyze/quick', async (req, res) => {
       return res.status(400).json({ error: 'Source code not available' });
     }
     
-    const completion = await openrouter.chat.completions.create({
-      model: 'nex-agi/deepseek-v3.1-nex-n1:free',
-      messages: [
-        { 
-          role: 'system', 
-          content: 'Give 3 bullet points about security issues in this smart contract code.' 
-        },
-        { 
-          role: 'user', 
-          content: `Code: ${contractData.source_code.substring(0, 1000)}` 
-        }
-      ],
-      max_tokens: 300,
-      temperature: 0.1,
+    // UPDATED: Use direct fetch call instead of OpenAI SDK
+    const openRouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://audit-flow-three.vercel.app',
+        'X-Title': 'Smart Contract Auditor',
+      },
+      body: JSON.stringify({
+        model: 'nex-agi/deepseek-v3.1-nex-n1:free',
+        messages: [
+          { 
+            role: 'system', 
+            content: 'Give 3 bullet points about security issues in this smart contract code.' 
+          },
+          { 
+            role: 'user', 
+            content: `Code: ${contractData.source_code.substring(0, 1000)}` 
+          }
+        ],
+        max_tokens: 300,
+        temperature: 0.1,
+      })
     });
     
-    const quickAnalysis = completion.choices[0].message.content;
+    const responseData = await openRouterResponse.json();
+    
+    if (!openRouterResponse.ok) {
+      throw new Error(`OpenRouter API Error (${openRouterResponse.status}): ${responseData.error?.message || JSON.stringify(responseData)}`);
+    }
+    
+    const quickAnalysis = responseData.choices[0].message.content;
     
     // Record quick analysis usage
     if (userAddress) {
