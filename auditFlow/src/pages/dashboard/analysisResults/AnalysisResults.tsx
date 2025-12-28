@@ -98,7 +98,6 @@ const AnalysisResults: React.FC = () => {
         .replace(/}\s*$/, '}')
         .trim();
       
-      console.log('Cleaned JSON string (first 500 chars):', cleanJson.substring(0, 500));
       
       const parsed = JSON.parse(cleanJson);
       console.log('Successfully parsed AI data:', {
@@ -516,7 +515,6 @@ echo "Contract: ${analysisData.contractAddress}"
       return <p className="no-analysis">No AI analysis content available.</p>;
     }
     
-    console.log('Rendering AI analysis content, length:', analysisData.aiAnalysis.length);
     
     if (parsedAIData?.detailedAnalysis) {
       return (
