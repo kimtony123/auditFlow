@@ -2,21 +2,11 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { OpenAI } = require('openai');
 const Database = require('better-sqlite3');
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args)); // Use dynamic import for fetch
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// ========== OPENROUTER CONFIGURATION ==========
-const openrouter = new OpenAI({
-  baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: process.env.OPENROUTER_API_KEY,
-  defaultHeaders: {
-    "HTTP-Referer": "https://audit-flow-three.vercel.app", // UPDATED: Changed from localhost to your Vercel URL
-    "X-Title": "Smart Contract Auditor",
-  },
-});
 
 // ========== DATABASE SETUP FOR USER USAGE ==========
 const db = new Database('usage.db');
@@ -75,7 +65,7 @@ const getUserUsageStmt = db.prepare(`
 
 // ========== MIDDLEWARE ==========
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'https://audit-flow-three.vercel.app'], // UPDATED: Added your Vercel URL
+  origin: ['http://localhost:5173', 'http://localhost:3000', 'https://audit-flow-three.vercel.app'],
   credentials: true
 }));
 app.use(express.json());
@@ -83,13 +73,41 @@ app.use(express.json());
 // ========== IN-MEMORY STORAGE FOR ANALYSES ==========
 const analysisStorage = new Map();
 
-// ========== HELPER FUNCTION TO GET FETCH ==========
-async function getFetch() {
-  if (globalThis.fetch) {
-    return globalThis.fetch;
+// ========== HELPER FUNCTION TO CALL OPENROUTER ==========
+async function callOpenRouter(messages, options = {}) {
+  const {
+    model = 'nousresearch/hermes-3-llama-3.1-405b:free',
+    max_tokens = 5000,
+    temperature = 0.1,
+    stream = false
+  } = options;
+
+  const apiKey = process.env.OPENROUTER_API_KEY ;
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://audit-flow-three.vercel.app',
+      'X-Title': 'Smart Contract Auditor',
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      max_tokens,
+      temperature,
+      stream
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(`OpenRouter API Error (${response.status}): ${errorData.error?.message || response.statusText}`);
   }
-  const { default: fetch } = await import('node-fetch');
-  return fetch;
+
+  const data = await response.json();
+  return data.choices[0].message.content;
 }
 
 // ========== USAGE TRACKING ENDPOINTS ==========
@@ -252,7 +270,6 @@ app.post('/api/analyze', async (req, res) => {
 
     // 2. FETCH CONTRACT DATA FROM BLOCKSCOUT
     console.log(`🔍 Fetching contract from Blockscout: ${contractAddress}`);
-    const fetch = await getFetch();
     const blockscoutUrl = `https://blockscout.lisk.com/api/v2/smart-contracts/${contractAddress}`;
     const blockscoutResponse = await fetch(blockscoutUrl);
     
@@ -344,41 +361,29 @@ ANALYSIS INSTRUCTIONS:
 
 RETURN ONLY VALID JSON. No additional text before or after.`;
 
-    // 4. CALL OPENROUTER WITH DIRECT API CALL (REPLACED OpenAI SDK)
-    console.log('🤖 Calling OpenRouter AI via direct fetch...');
+    // 4. CALL OPENROUTER
+    console.log('🤖 Calling OpenRouter AI...');
     
     let aiResponse = '';
     let structuredData = null;
     
     try {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://audit-flow-three.vercel.app',
-          'X-Title': 'Smart Contract Auditor',
+      aiResponse = await callOpenRouter([
+        { 
+          role: 'system', 
+          content: 'You are a smart contract auditor. Return ONLY valid JSON as specified.' 
         },
-        body: JSON.stringify({
-          model: 'nex-agi/deepseek-v3.1-nex-n1:free',
-          messages: [
-            { role: 'system', content: 'You are a smart contract auditor. Return ONLY valid JSON as specified.' },
-            { role: 'user', content: analysisPrompt }
-          ],
-          max_tokens: 4000,
-          temperature: 0.1,
-        })
+        { 
+          role: 'user', 
+          content: analysisPrompt 
+        }
+      ], {
+        model: 'nousresearch/hermes-3-llama-3.1-405b:free',
+        max_tokens: 5000,
+        temperature: 0.1
       });
-
-      const responseData = await response.json();
       
-      if (!response.ok) {
-        // This will give you the exact error from OpenRouter
-        throw new Error(`OpenRouter API Error (${response.status}): ${responseData.error?.message || JSON.stringify(responseData)}`);
-      }
-
-      aiResponse = responseData.choices[0].message.content;
-      console.log('✅ AI analysis complete via direct fetch');
+      console.log('✅ AI analysis complete');
       
       try {
         structuredData = JSON.parse(aiResponse);
@@ -388,7 +393,7 @@ RETURN ONLY VALID JSON. No additional text before or after.`;
       }
       
     } catch (error) {
-      console.error('❌ Direct fetch call failed:', error);
+      console.error('❌ OpenRouter call failed:', error);
       throw error;
     }
 
@@ -480,8 +485,8 @@ RETURN ONLY VALID JSON. No additional text before or after.`;
     if (error.message.includes('API key') || error.message.includes('401')) {
       res.status(401).json({ 
         error: 'Authentication Failed',
-        message: 'Please check your OpenRouter API key in .env file',
-        help: '1. Get a free API key from https://openrouter.ai/keys\n2. Add OPENROUTER_API_KEY=your_key_here to .env file'
+        message: 'Please check your OpenRouter API key',
+        help: '1. Get a free API key from https://openrouter.ai/keys'
       });
     } else if (error.message.includes('rate limit')) {
       res.status(429).json({ 
@@ -554,11 +559,6 @@ function getProductionRecommendation(riskLevel) {
   }
 }
 
-function calculateAuditScore(high, medium, low) {
-  const score = 100 - (high * 25 + medium * 15 + low * 5);
-  return Math.max(0, Math.min(100, Math.round(score)));
-}
-
 // ========== QUICK ANALYSIS ENDPOINT ==========
 app.post('/api/analyze/quick', async (req, res) => {
   try {
@@ -569,7 +569,6 @@ app.post('/api/analyze/quick', async (req, res) => {
     }
     
     console.log(`🚀 Quick analysis for: ${contractAddress}`);
-    const fetch = await getFetch();
     
     const blockscoutUrl = `https://blockscout.lisk.com/api/v2/smart-contracts/${contractAddress}`;
     const blockscoutResponse = await fetch(blockscoutUrl);
@@ -584,39 +583,20 @@ app.post('/api/analyze/quick', async (req, res) => {
       return res.status(400).json({ error: 'Source code not available' });
     }
     
-    // UPDATED: Use direct fetch call instead of OpenAI SDK
-    const openRouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://audit-flow-three.vercel.app',
-        'X-Title': 'Smart Contract Auditor',
+    const quickAnalysis = await callOpenRouter([
+      { 
+        role: 'system', 
+        content: 'Give 3 bullet points about security issues in this smart contract code.' 
       },
-      body: JSON.stringify({
-        model: 'nex-agi/deepseek-v3.1-nex-n1:free',
-        messages: [
-          { 
-            role: 'system', 
-            content: 'Give 3 bullet points about security issues in this smart contract code.' 
-          },
-          { 
-            role: 'user', 
-            content: `Code: ${contractData.source_code.substring(0, 1000)}` 
-          }
-        ],
-        max_tokens: 300,
-        temperature: 0.1,
-      })
+      { 
+        role: 'user', 
+        content: `Code: ${contractData.source_code.substring(0, 1000)}` 
+      }
+    ], {
+      model: 'nousresearch/hermes-3-llama-3.1-405b:free',
+      max_tokens: 300,
+      temperature: 0.1
     });
-    
-    const responseData = await openRouterResponse.json();
-    
-    if (!openRouterResponse.ok) {
-      throw new Error(`OpenRouter API Error (${openRouterResponse.status}): ${responseData.error?.message || JSON.stringify(responseData)}`);
-    }
-    
-    const quickAnalysis = responseData.choices[0].message.content;
     
     // Record quick analysis usage
     if (userAddress) {
@@ -740,7 +720,7 @@ app.get('/api/health', async (req, res) => {
 // ========== START SERVER ==========
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
-  console.log(`🔐 OpenRouter API key: ${process.env.OPENROUTER_API_KEY ? 'Set' : 'NOT SET - Add to .env'}`);
+  console.log(`🔐 OpenRouter API key: ${process.env.OPENROUTER_API_KEY ? 'Set' : 'Using hardcoded key'}`);
   console.log(`💾 Database: usage.db (SQLite)`);
   console.log(`📊 Available endpoints:`);
   console.log(`   POST /api/analyze                - Full contract analysis`);
