@@ -77,12 +77,12 @@ const analysisStorage = new Map();
 async function callOpenRouter(messages, options = {}) {
   const {
     model = 'nousresearch/hermes-3-llama-3.1-405b:free',
-    max_tokens = 5000,
+    max_tokens = 4000,
     temperature = 0.1,
     stream = false
   } = options;
 
-  const apiKey = process.env.OPENROUTER_API_KEY ;
+  const apiKey = process.env.OPENROUTER_API_KEY || "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";
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -289,7 +289,7 @@ app.post('/api/analyze', async (req, res) => {
     console.log('✅ Contract data fetched successfully');
 
     // 3. PREPARE SMART CONTRACT ANALYSIS PROMPT
-    const truncatedSourceCode = contractData.source_code.substring(0, 4000);
+    const truncatedSourceCode = contractData.source_code.substring(0, 2000);
     
     const analysisPrompt = `
 You are a senior smart contract security auditor. Analyze this Solidity contract and provide a comprehensive audit report in the following EXACT JSON format:
