@@ -3,12 +3,12 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const Database = require('better-sqlite3');
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args)); // Use dynamic import for fetch
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ========== DATABASE SETUP FOR USER USAGE ==========
+// ========== DATABASE SETUP ==========
 const db = new Database('usage.db');
 
 // Create tables if they don't exist
@@ -36,12 +36,15 @@ db.exec(`
     contract_name TEXT,
     risk_level TEXT,
     risk_score INTEGER,
+    analysis_type TEXT DEFAULT 'full',
+    response_data TEXT NOT NULL, -- Store the entire responseData as JSON
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
   
   CREATE INDEX IF NOT EXISTS idx_user_feature ON feature_usage(user_id, feature_type);
   CREATE INDEX IF NOT EXISTS idx_recorded_at ON feature_usage(recorded_at);
   CREATE INDEX IF NOT EXISTS idx_analyses_user ON analyses(user_address);
+  CREATE INDEX IF NOT EXISTS idx_analyses_contract ON analyses(contract_address);
 `);
 
 // Prepare reusable SQL statements
@@ -49,8 +52,8 @@ const insertUserStmt = db.prepare('INSERT OR IGNORE INTO users (address) VALUES 
 const findUserIdStmt = db.prepare('SELECT id FROM users WHERE address = ?');
 const insertUsageStmt = db.prepare('INSERT INTO feature_usage (user_id, feature_type, quantity) VALUES (?, ?, ?)');
 const insertAnalysisStmt = db.prepare(`
-  INSERT INTO analyses (analysis_id, user_address, contract_address, contract_name, risk_level, risk_score)
-  VALUES (?, ?, ?, ?, ?, ?)
+  INSERT INTO analyses (analysis_id, user_address, contract_address, contract_name, risk_level, risk_score, analysis_type, response_data)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `);
 const getUserUsageStmt = db.prepare(`
   SELECT 
@@ -63,56 +66,169 @@ const getUserUsageStmt = db.prepare(`
   GROUP BY feature_type
 `);
 
+// NEW: Get analysis from database by ID
+const getAnalysisFromDbStmt = db.prepare(`
+  SELECT * FROM analyses WHERE analysis_id = ?
+`);
+
+// Get user's analyses (without response_data for list view)
+const getUserAnalysesStmt = db.prepare(`
+  SELECT 
+    analysis_id, 
+    contract_address, 
+    contract_name, 
+    risk_level, 
+    risk_score, 
+    analysis_type,
+    created_at
+  FROM analyses 
+  WHERE user_address = ?
+  ORDER BY created_at DESC
+  LIMIT ? OFFSET ?
+`);
+
 // ========== MIDDLEWARE ==========
 app.use(cors({
   origin: ['http://localhost:5173', 'http://localhost:3000', 'https://audit-flow-three.vercel.app'],
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ========== IN-MEMORY STORAGE FOR ANALYSES ==========
+// ========== IN-MEMORY STORAGE ==========
 const analysisStorage = new Map();
 
-// ========== HELPER FUNCTION TO CALL OPENROUTER ==========
+// ========== HELPER FUNCTIONS ==========
+function extractStructureFromText(text) {
+  try {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    
+    return {
+      executiveSummary: text.substring(0, 200) + '...',
+      riskLevel: 'medium',
+      riskScore: 50,
+      vulnerabilities: [],
+      gasOptimizations: [],
+      bestPractices: [],
+      recommendations: ['Further manual review recommended'],
+      detailedAnalysis: text
+    };
+  } catch (error) {
+    return {
+      executiveSummary: 'Analysis completed but formatting failed',
+      riskLevel: 'unknown',
+      riskScore: 50,
+      vulnerabilities: [],
+      gasOptimizations: [],
+      bestPractices: [],
+      recommendations: ['Parse error occurred'],
+      detailedAnalysis: text
+    };
+  }
+}
+
+function calculateAuditScoreFromVulns(vulnerabilities = []) {
+  const high = vulnerabilities.filter(v => v.severity === 'high').length;
+  const medium = vulnerabilities.filter(v => v.severity === 'medium').length;
+  const low = vulnerabilities.filter(v => v.severity === 'low').length;
+  
+  const score = 100 - (high * 25 + medium * 15 + low * 5);
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function getProductionRecommendation(riskLevel) {
+  switch (riskLevel?.toLowerCase()) {
+    case 'high':
+      return 'Do not deploy until critical issues are fixed';
+    case 'medium':
+      return 'Deploy with caution after addressing medium issues';
+    case 'low':
+      return 'Safe to deploy with minor improvements';
+    default:
+      return 'Manual review required';
+  }
+}
+
+// ========== IMPROVED OPENROUTER HELPER ==========
 async function callOpenRouter(messages, options = {}) {
   const {
-    model = 'nousresearch/hermes-3-llama-3.1-405b:free',
-    max_tokens = 4000,
+    model = 'xiaomi/mimo-v2-flash:free',
+    max_tokens = 2000,
     temperature = 0.1,
     stream = false
   } = options;
 
-  const apiKey = process.env.OPENROUTER_API_KEY || "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";
-
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://audit-flow-three.vercel.app',
-      'X-Title': 'Smart Contract Auditor',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      max_tokens,
-      temperature,
-      stream
-    })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(`OpenRouter API Error (${response.status}): ${errorData.error?.message || response.statusText}`);
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('OpenRouter API key is not configured. Please set OPENROUTER_API_KEY in environment variables.');
   }
 
-  const data = await response.json();
-  return data.choices[0].message.content;
+  console.log(`📡 Sending request to OpenRouter with model: ${model}, max_tokens: ${max_tokens}`);
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://audit-flow-three.vercel.app',
+        'X-Title': 'Smart Contract Auditor',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens,
+        temperature,
+        stream
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = { error: { message: `HTTP ${response.status}: ${response.statusText}` } };
+      }
+      
+      if (response.status === 401) {
+        throw new Error(`OpenRouter Authentication Error (401): ${errorData.error?.message || 'Invalid API key'}`);
+      } else if (response.status === 429) {
+        throw new Error('OpenRouter Rate Limit Error (429): Too many requests. Please try again later.');
+      } else if (response.status === 400) {
+        throw new Error(`OpenRouter Bad Request (400): ${errorData.error?.message || 'Invalid request parameters'}`);
+      } else {
+        throw new Error(`OpenRouter API Error (${response.status}): ${errorData.error?.message || response.statusText}`);
+      }
+    }
+
+    const data = await response.json();
+    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error('Invalid response format from OpenRouter');
+    }
+
+    return data.choices[0].message.content;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('OpenRouter request timed out after 60 seconds');
+    }
+    throw error;
+  }
 }
 
 // ========== USAGE TRACKING ENDPOINTS ==========
-
-// Record feature usage
 app.post('/api/user/features/usage', async (req, res) => {
   try {
     console.log('📊 Recording feature usage...');
@@ -219,20 +335,17 @@ app.get('/api/user/:address/usage', async (req, res) => {
   }
 });
 
-// Get user's analysis history
+// Get user's analysis history (just metadata)
 app.get('/api/user/:address/analyses', async (req, res) => {
   try {
     const { address } = req.params;
     const { limit = 10, offset = 0 } = req.query;
 
-    const analyses = db.prepare(`
-      SELECT 
-        analysis_id, contract_address, contract_name, risk_level, risk_score, created_at
-      FROM analyses 
-      WHERE user_address = ?
-      ORDER BY created_at DESC
-      LIMIT ? OFFSET ?
-    `).all(address, parseInt(limit), parseInt(offset));
+    const analyses = getUserAnalysesStmt.all(
+      address, 
+      parseInt(limit), 
+      parseInt(offset)
+    );
 
     const total = db.prepare(`
       SELECT COUNT(*) as count FROM analyses WHERE user_address = ?
@@ -257,7 +370,7 @@ app.post('/api/analyze', async (req, res) => {
   console.log('📦 Received analysis request...');
   
   try {
-    const { contractAddress, analysisType, userAddress, userTier, network = 'lisk' } = req.body;
+    const { contractAddress, userAddress, analysisType = 'full', network = 'lisk' } = req.body;
 
     // 1. VALIDATE INPUT
     if (!contractAddress) {
@@ -268,296 +381,308 @@ app.post('/api/analyze', async (req, res) => {
       return res.status(400).json({ error: 'Invalid contract address format.' });
     }
 
-    // 2. FETCH CONTRACT DATA FROM BLOCKSCOUT
+    // 2. FETCH CONTRACT DATA WITH ERROR HANDLING
     console.log(`🔍 Fetching contract from Blockscout: ${contractAddress}`);
-    const blockscoutUrl = `https://blockscout.lisk.com/api/v2/smart-contracts/${contractAddress}`;
-    const blockscoutResponse = await fetch(blockscoutUrl);
     
-    if (!blockscoutResponse.ok) {
-      if (blockscoutResponse.status === 404) {
-        throw new Error('Contract not found on Blockscout.');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    
+    try {
+      const blockscoutUrl = `https://blockscout.lisk.com/api/v2/smart-contracts/${contractAddress}`;
+      const blockscoutResponse = await fetch(blockscoutUrl, {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!blockscoutResponse.ok) {
+        if (blockscoutResponse.status === 404) {
+          throw new Error('Contract not found on Blockscout.');
+        }
+        throw new Error(`Blockscout API failed: ${blockscoutResponse.statusText}`);
       }
-      throw new Error(`Blockscout API failed: ${blockscoutResponse.statusText}`);
-    }
-    
-    const contractData = await blockscoutResponse.json();
-    
-    if (!contractData.source_code) {
-      throw new Error('Contract source code not found or not verified.');
-    }
-    
-    console.log('✅ Contract data fetched successfully');
+      
+      const contractData = await blockscoutResponse.json();
+      
+      if (!contractData.source_code) {
+        throw new Error('Contract source code not found or not verified.');
+      }
+      
+      console.log('✅ Contract data fetched successfully');
+      
+      // 3. REDUCE PROMPT SIZE
+      const truncatedSourceCode = contractData.source_code.substring(0, 3000);
+      
+      const analysisPrompt = `You are a senior smart contract security auditor. Analyze this Solidity contract and provide a JSON audit report.
 
-    // 3. PREPARE SMART CONTRACT ANALYSIS PROMPT
-    const truncatedSourceCode = contractData.source_code.substring(0, 2000);
-    
-    const analysisPrompt = `
-You are a senior smart contract security auditor. Analyze this Solidity contract and provide a comprehensive audit report in the following EXACT JSON format:
+CONTRACT: ${contractAddress}
+NAME: ${contractData.name || 'Unknown'}
+COMPILER: ${contractData.compiler_version || 'Unknown'}
 
-{
-  "executiveSummary": "Brief 3-4 sentence summary",
-  "riskLevel": "high|medium|low",
-  "riskScore": 0-100,
-  "vulnerabilities": [
-    {
-      "severity": "high|medium|low",
-      "title": "Vulnerability name",
-      "description": "Detailed description",
-      "location": "File:Line or Function name",
-      "recommendation": "How to fix it",
-      "exploitScenario": "How it could be exploited"
-    }
-  ],
-  "gasOptimizations": [
-    "Specific optimization 1",
-    "Specific optimization 2"
-  ],
-  "bestPractices": [
-    {
-      "check": "Naming conventions",
-      "compliant": true/false,
-      "details": "Explanation"
-    },
-    {
-      "check": "Error handling",
-      "compliant": true/false,
-      "details": "Explanation"
-    },
-    {
-      "check": "Access control",
-      "compliant": true/false,
-      "details": "Explanation"
-    },
-    {
-      "check": "Reentrancy protection",
-      "compliant": true/false,
-      "details": "Explanation"
-    }
-  ],
-  "recommendations": [
-    "Priority recommendation 1",
-    "Priority recommendation 2"
-  ],
-  "detailedAnalysis": "Full 3-5 paragraph analysis here"
-}
-
-CONTRACT INFORMATION:
-- Address: ${contractAddress}
-- Name: ${contractData.name || 'Unknown'}
-- Compiler: ${contractData.compiler_version || 'Unknown'}
-- Network: ${network.toUpperCase()}
-
-CONTRACT SOURCE CODE (truncated):
+SOURCE CODE:
 \`\`\`solidity
 ${truncatedSourceCode}
 \`\`\`
 
-ANALYSIS INSTRUCTIONS:
-1. Look for: reentrancy, overflow/underflow, access control, logic errors
-2. Check gas optimizations: storage vs memory, loop optimizations
-3. Verify compliance with best practices
-4. Provide actionable recommendations
-5. Assign risk score based on vulnerabilities found
+Provide analysis in this JSON format only:
+{
+  "executiveSummary": "Brief summary",
+  "riskLevel": "high|medium|low",
+  "riskScore": 0-100,
+  "vulnerabilities": [{"severity": "high|medium|low", "title": "...", "description": "..."}],
+  "gasOptimizations": ["..."],
+  "bestPractices": [{"check": "...", "compliant": true/false, "details": "..."}],
+  "recommendations": ["..."],
+  "detailedAnalysis": "..."
+}
 
-RETURN ONLY VALID JSON. No additional text before or after.`;
+Focus on: reentrancy, overflow/underflow, access control issues.
+Return ONLY JSON, no other text.`;
 
-    // 4. CALL OPENROUTER
-    console.log('🤖 Calling OpenRouter AI...');
-    
-    let aiResponse = '';
-    let structuredData = null;
-    
-    try {
-      aiResponse = await callOpenRouter([
-        { 
-          role: 'system', 
-          content: 'You are a smart contract auditor. Return ONLY valid JSON as specified.' 
-        },
-        { 
-          role: 'user', 
-          content: analysisPrompt 
-        }
-      ], {
-        model: 'nousresearch/hermes-3-llama-3.1-405b:free',
-        max_tokens: 5000,
-        temperature: 0.1
-      });
+      // 4. CALL OPENROUTER WITH SIMPLIFIED REQUEST
+      console.log('🤖 Calling OpenRouter AI...');
       
-      console.log('✅ AI analysis complete');
+      let aiResponse = '';
+      let structuredData = null;
       
       try {
-        structuredData = JSON.parse(aiResponse);
-      } catch (parseError) {
-        console.log('   Failed to parse JSON from AI response, using fallback...');
-        structuredData = extractStructureFromText(aiResponse || '');
-      }
-      
-    } catch (error) {
-      console.error('❌ OpenRouter call failed:', error);
-      throw error;
-    }
-
-    // 5. ENRICH STRUCTURED DATA WITH CONTRACT INFO
-    const riskScore = structuredData.riskScore || calculateAuditScoreFromVulns(structuredData.vulnerabilities);
-    
-    const enrichedData = {
-      ...structuredData,
-      contractAddress,
-      contractName: contractData.name || 'Unnamed Contract',
-      analysisDate: new Date().toISOString().split('T')[0],
-      timestamp: new Date().toISOString(),
-      compilerVersion: contractData.compiler_version,
-      network: network,
-      analysisType: analysisType || 'full',
-      isVerified: contractData.is_verified,
-      vulnerabilityCounts: {
-        high: structuredData.vulnerabilities?.filter(v => v.severity === 'high').length || 0,
-        medium: structuredData.vulnerabilities?.filter(v => v.severity === 'medium').length || 0,
-        low: structuredData.vulnerabilities?.filter(v => v.severity === 'low').length || 0,
-        total: structuredData.vulnerabilities?.length || 0
-      },
-      auditScore: riskScore
-    };
-
-    // 6. CREATE RESPONSE DATA
-    const analysisId = `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    const responseData = {
-      success: true,
-      analysisId,
-      contractAddress,
-      contractName: contractData.name || 'Unnamed Contract',
-      isVerified: contractData.is_verified,
-      compilerVersion: contractData.compiler_version,
-      abi: contractData.abi || [],
-      aiAnalysis: aiResponse,
-      structuredReport: enrichedData,
-      analysisDate: enrichedData.analysisDate,
-      aiSummary: enrichedData.executiveSummary || enrichedData.detailedAnalysis || '',
-      vulnerabilities: enrichedData.vulnerabilities || [],
-      gasOptimizations: enrichedData.gasOptimizations || [],
-      bestPractices: enrichedData.bestPractices || [],
-      riskScore: enrichedData.auditScore,
-      recommendations: enrichedData.recommendations || [],
-      timestamp: enrichedData.timestamp,
-      analysisType: analysisType || 'full',
-      network: network,
-      sourceCodeLength: contractData.source_code?.length || 0,
-      sourceCodePreview: truncatedSourceCode.substring(0, 500) + '...',
-      productionRecommendation: getProductionRecommendation(enrichedData.riskLevel)
-    };
-
-    // 7. STORE IN MEMORY AND DATABASE
-    analysisStorage.set(analysisId, responseData);
-
-    // AUTO-RECORD USAGE FOR ANALYSIS FEATURE
-    if (userAddress) {
-      try {
-        const transaction = db.transaction(() => {
-          insertUserStmt.run(userAddress);
-          const user = findUserIdStmt.get(userAddress);
-          insertUsageStmt.run(user.id, 'ANALYSIS', 1);
+        aiResponse = await callOpenRouter([
+          { 
+            role: 'system', 
+            content: 'You are a smart contract auditor. Return ONLY valid JSON as specified.' 
+          },
+          { 
+            role: 'user', 
+            content: analysisPrompt 
+          }
+        ], {
+          model: 'xiaomi/mimo-v2-flash:free',
+          max_tokens: 1500,
+          temperature: 0.1
+        });
+        
+        console.log('✅ AI analysis complete, length:', aiResponse.length);
+        
+        // 5. PARSE RESPONSE WITH BETTER ERROR HANDLING
+        try {
+          const cleanedResponse = aiResponse
+            .replace(/```json\s*/g, '')
+            .replace(/```\s*/g, '')
+            .trim();
           
-          // Also store in analyses table for user history
+          structuredData = JSON.parse(cleanedResponse);
+        } catch (parseError) {
+          console.log('⚠️ JSON parse failed, extracting JSON from text...');
+          structuredData = extractStructureFromText(aiResponse);
+        }
+        
+      } catch (error) {
+        console.error('❌ OpenRouter call failed:', error.message);
+        
+        // Try fallback model if first fails
+        try {
+          console.log('🔄 Trying fallback model...');
+          aiResponse = await callOpenRouter([
+            { 
+              role: 'system', 
+              content: 'Return JSON audit summary only.' 
+            },
+            { 
+              role: 'user', 
+              content: `Brief security audit for contract ${contractAddress}. Return JSON.` 
+            }
+          ], {
+            model: 'arcee-ai/trinity-mini:free',
+            max_tokens: 2000,
+            temperature: 0.1
+          });
+          
+          structuredData = extractStructureFromText(aiResponse);
+        } catch (fallbackError) {
+          throw new Error(`AI analysis failed: ${error.message}`);
+        }
+      }
+
+      // 6. ENRICH STRUCTURED DATA WITH CONTRACT INFO
+      const riskScore = structuredData.riskScore || calculateAuditScoreFromVulns(structuredData.vulnerabilities);
+      
+      const enrichedData = {
+        ...structuredData,
+        contractAddress,
+        contractName: contractData.name || 'Unnamed Contract',
+        analysisDate: new Date().toISOString().split('T')[0],
+        timestamp: new Date().toISOString(),
+        compilerVersion: contractData.compiler_version,
+        network: network,
+        analysisType: analysisType,
+        isVerified: contractData.is_verified,
+        vulnerabilityCounts: {
+          high: structuredData.vulnerabilities?.filter(v => v.severity === 'high').length || 0,
+          medium: structuredData.vulnerabilities?.filter(v => v.severity === 'medium').length || 0,
+          low: structuredData.vulnerabilities?.filter(v => v.severity === 'low').length || 0,
+          total: structuredData.vulnerabilities?.length || 0
+        },
+        auditScore: riskScore
+      };
+
+      // 7. CREATE RESPONSE DATA
+      const analysisId = `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      const responseData = {
+        success: true,
+        analysisId,
+        contractAddress,
+        contractName: contractData.name || 'Unnamed Contract',
+        isVerified: contractData.is_verified,
+        compilerVersion: contractData.compiler_version,
+        abi: contractData.abi || [],
+        aiAnalysis: aiResponse,
+        structuredReport: enrichedData,
+        analysisDate: enrichedData.analysisDate,
+        aiSummary: enrichedData.executiveSummary || enrichedData.detailedAnalysis || '',
+        vulnerabilities: enrichedData.vulnerabilities || [],
+        gasOptimizations: enrichedData.gasOptimizations || [],
+        bestPractices: enrichedData.bestPractices || [],
+        riskScore: enrichedData.auditScore,
+        recommendations: enrichedData.recommendations || [],
+        timestamp: enrichedData.timestamp,
+        analysisType: analysisType,
+        network: network,
+        sourceCodeLength: contractData.source_code?.length || 0,
+        sourceCodePreview: truncatedSourceCode.substring(0, 500) + '...',
+        productionRecommendation: getProductionRecommendation(enrichedData.riskLevel)
+      };
+
+      // 8. STORE IN MEMORY AND DATABASE
+      analysisStorage.set(analysisId, responseData);
+
+      // Store in database (NO user prompt stored!)
+      if (userAddress) {
+        try {
+          const transaction = db.transaction(() => {
+            // Record user usage
+            insertUserStmt.run(userAddress);
+            const user = findUserIdStmt.get(userAddress);
+            insertUsageStmt.run(user.id, 'ANALYSIS', 1);
+            
+            // Store analysis with responseData (entire object as JSON)
+            insertAnalysisStmt.run(
+              analysisId,
+              userAddress,
+              contractAddress,
+              contractData.name || 'Unnamed Contract',
+              enrichedData.riskLevel,
+              riskScore,
+              analysisType,
+              JSON.stringify(responseData) // Store the entire responseData
+            );
+          });
+          
+          transaction();
+          console.log(`📊 Recorded usage and stored analysis for: ${userAddress}`);
+        } catch (error) {
+          console.error('Database recording failed:', error);
+        }
+      } else {
+        // Still store analysis even without user (for anonymous use)
+        try {
           insertAnalysisStmt.run(
             analysisId,
-            userAddress,
+            null, // No user address
             contractAddress,
             contractData.name || 'Unnamed Contract',
             enrichedData.riskLevel,
-            riskScore
+            riskScore,
+            analysisType,
+            JSON.stringify(responseData)
           );
-        });
-        
-        transaction();
-        console.log(`📊 Auto-recorded analysis usage for: ${userAddress}`);
-      } catch (error) {
-        console.error('Auto-usage recording failed:', error);
+          console.log('📝 Stored anonymous analysis');
+        } catch (error) {
+          console.error('Anonymous analysis storage failed:', error);
+        }
       }
+
+      // 9. SEND RESPONSE
+      res.json(responseData);
+
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      throw fetchError;
     }
 
-    // 8. SEND RESPONSE
-    res.json(responseData);
-
   } catch (error) {
-    console.error('❌ Analysis error:', error);
+    console.error('❌ Analysis error:', error.message);
     
-    if (error.message.includes('API key') || error.message.includes('401')) {
+    if (error.message.includes('Authentication') || error.message.includes('401')) {
       res.status(401).json({ 
         error: 'Authentication Failed',
-        message: 'Please check your OpenRouter API key',
-        help: '1. Get a free API key from https://openrouter.ai/keys'
+        message: 'Invalid or missing OpenRouter API key',
+        help: 'Check your OPENROUTER_API_KEY environment variable'
       });
-    } else if (error.message.includes('rate limit')) {
+    } else if (error.message.includes('Rate Limit') || error.message.includes('429')) {
       res.status(429).json({ 
         error: 'Rate Limit Exceeded',
-        message: 'Please try again in a few minutes',
+        message: 'Please wait a minute before trying again',
+      });
+    } else if (error.message.includes('timed out')) {
+      res.status(504).json({ 
+        error: 'Request Timeout',
+        message: 'The AI analysis took too long to respond',
+        suggestion: 'Try a smaller contract or try again later'
       });
     } else {
       res.status(500).json({ 
         error: 'Analysis Failed', 
         details: error.message,
-        suggestion: 'Try using a smaller contract or check your API key'
+        suggestion: 'Try a different contract or check your API key'
       });
     }
   }
 });
 
-// ========== HELPER FUNCTIONS ==========
-function extractStructureFromText(text) {
+// ========== GET ANALYSIS BY ID ==========
+app.get('/api/analysis/:analysisId', async (req, res) => {
   try {
-    // Try to find JSON in the text
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+    const { analysisId } = req.params;
+    
+    console.log(`🔍 Looking for analysis: ${analysisId}`);
+    
+    // First check in-memory storage
+    let analysis = analysisStorage.get(analysisId);
+    
+    if (!analysis) {
+      console.log('📄 Checking database for analysis...');
+      // Check database
+      const dbAnalysis = getAnalysisFromDbStmt.get(analysisId);
+      
+      if (!dbAnalysis) {
+        return res.status(404).json({ 
+          error: 'Analysis not found',
+          analysisId 
+        });
+      }
+      
+      // Parse response_data from database
+      try {
+        analysis = JSON.parse(dbAnalysis.response_data);
+        console.log('✅ Retrieved analysis from database');
+      } catch (parseError) {
+        console.error('❌ Failed to parse analysis from database:', parseError);
+        return res.status(500).json({ 
+          error: 'Failed to parse stored analysis',
+          analysisId 
+        });
+      }
+    } else {
+      console.log('✅ Retrieved analysis from memory');
     }
     
-    // Fallback structure
-    return {
-      executiveSummary: text.substring(0, 200) + '...',
-      riskLevel: 'medium',
-      riskScore: 50,
-      vulnerabilities: [],
-      gasOptimizations: [],
-      bestPractices: [],
-      recommendations: ['Further manual review recommended'],
-      detailedAnalysis: text
-    };
+    res.json(analysis);
   } catch (error) {
-    return {
-      executiveSummary: 'Analysis completed but formatting failed',
-      riskLevel: 'unknown',
-      riskScore: 50,
-      vulnerabilities: [],
-      gasOptimizations: [],
-      bestPractices: [],
-      recommendations: ['Parse error occurred'],
-      detailedAnalysis: text
-    };
+    console.error('❌ Error fetching analysis:', error);
+    res.status(500).json({ error: 'Failed to fetch analysis' });
   }
-}
-
-function calculateAuditScoreFromVulns(vulnerabilities = []) {
-  const high = vulnerabilities.filter(v => v.severity === 'high').length;
-  const medium = vulnerabilities.filter(v => v.severity === 'medium').length;
-  const low = vulnerabilities.filter(v => v.severity === 'low').length;
-  
-  const score = 100 - (high * 25 + medium * 15 + low * 5);
-  return Math.max(0, Math.min(100, Math.round(score)));
-}
-
-function getProductionRecommendation(riskLevel) {
-  switch (riskLevel?.toLowerCase()) {
-    case 'high':
-      return 'Do not deploy until critical issues are fixed';
-    case 'medium':
-      return 'Deploy with caution after addressing medium issues';
-    case 'low':
-      return 'Safe to deploy with minor improvements';
-    default:
-      return 'Manual review required';
-  }
-}
+});
 
 // ========== QUICK ANALYSIS ENDPOINT ==========
 app.post('/api/analyze/quick', async (req, res) => {
@@ -593,8 +718,8 @@ app.post('/api/analyze/quick', async (req, res) => {
         content: `Code: ${contractData.source_code.substring(0, 1000)}` 
       }
     ], {
-      model: 'nousresearch/hermes-3-llama-3.1-405b:free',
-      max_tokens: 300,
+      model: 'xiaomi/mimo-v2-flash:free',
+      max_tokens: 500,
       temperature: 0.1
     });
     
@@ -624,22 +749,7 @@ app.post('/api/analyze/quick', async (req, res) => {
   }
 });
 
-// ========== OTHER ENDPOINTS ==========
-app.get('/api/analysis/:analysisId', async (req, res) => {
-  try {
-    const { analysisId } = req.params;
-    const analysis = analysisStorage.get(analysisId);
-    
-    if (!analysis) {
-      return res.status(404).json({ error: 'Analysis not found' });
-    }
-    
-    res.json(analysis);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch analysis' });
-  }
-});
-
+// ========== LIST ALL ANALYSES (for admin/testing) ==========
 app.get('/api/analyses', async (req, res) => {
   try {
     const analyses = Array.from(analysisStorage.entries()).map(([id, data]) => ({
@@ -696,40 +806,85 @@ app.get('/api/admin/stats', async (req, res) => {
   }
 });
 
+// ========== DIAGNOSTIC ENDPOINT ==========
+app.get('/api/debug/openrouter', async (req, res) => {
+  try {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    const hasKey = !!apiKey;
+    const keyPreview = apiKey ? `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}` : 'Not set';
+    
+    // Test with a tiny request
+    const testResponse = await callOpenRouter([
+      { role: 'user', content: 'Say "Hello" in JSON format: {"message": "hello"}' }
+    ], {
+      model: 'xiaomi/mimo-v2-flash:free',
+      max_tokens: 50
+    });
+    
+    res.json({
+      status: 'success',
+      openrouter: {
+        apiKeyConfigured: hasKey,
+        keyPreview: keyPreview,
+        testResponse: testResponse,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      error: error.message,
+      suggestion: 'Check your OPENROUTER_API_KEY environment variable'
+    });
+  }
+});
+
 app.get('/api/health', async (req, res) => {
   const dbStatus = db.open ? 'connected' : 'disconnected';
+  
+  // Count analyses in memory and database
+  const dbAnalysisCount = db.prepare('SELECT COUNT(*) as count FROM analyses').get();
   
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    analysesStored: analysisStorage.size,
+    storage: {
+      memoryAnalyses: analysisStorage.size,
+      databaseAnalyses: dbAnalysisCount.count,
+      totalAnalyses: analysisStorage.size + dbAnalysisCount.count
+    },
     openrouterConfigured: !!process.env.OPENROUTER_API_KEY,
     database: dbStatus,
     endpoints: {
       analyze: 'POST /api/analyze',
       quickAnalyze: 'POST /api/analyze/quick',
       getAnalysis: 'GET /api/analysis/:id',
+      getUserAnalyses: 'GET /api/user/:address/analyses',
       recordUsage: 'POST /api/user/features/usage',
       getUserUsage: 'GET /api/user/:address/usage',
-      getUserAnalyses: 'GET /api/user/:address/analyses',
-      health: 'GET /api/health'
+      health: 'GET /api/health',
+      debug: 'GET /api/debug/openrouter'
     }
   });
 });
 
 // ========== START SERVER ==========
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-  console.log(`🔐 OpenRouter API key: ${process.env.OPENROUTER_API_KEY ? 'Set' : 'Using hardcoded key'}`);
-  console.log(`💾 Database: usage.db (SQLite)`);
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`🔐 OpenRouter configured: ${process.env.OPENROUTER_API_KEY ? 'YES' : 'NO'}`);
+  console.log(`💾 Database: usage.db - Stores responseData (NO user prompts)`);
   console.log(`📊 Available endpoints:`);
   console.log(`   POST /api/analyze                - Full contract analysis`);
   console.log(`   POST /api/analyze/quick          - Quick security check`);
   console.log(`   POST /api/user/features/usage    - Record feature usage`);
   console.log(`   GET  /api/user/:address/usage    - Get user usage stats`);
   console.log(`   GET  /api/user/:address/analyses - Get user analysis history`);
-  console.log(`   GET  /api/analysis/:id           - Retrieve analysis by ID`);
-  console.log(`   GET  /api/analyses               - List all analyses`);
+  console.log(`   GET  /api/analysis/:id           - Get full analysis by ID (memory + database)`);
+  console.log(`   GET  /api/analyses               - List all analyses (memory only)`);
   console.log(`   GET  /api/health                 - Health check`);
+  console.log(`   GET  /api/debug/openrouter       - Debug OpenRouter connection`);
   console.log(`   GET  /api/admin/stats?adminKey=  - Platform statistics (admin)`);
+  console.log(`\n📝 User usage tracking: ACTIVE`);
+  console.log(`🔒 User prompts: NOT stored (as requested)`);
+  console.log(`💾 Analysis storage: responseData stored in database for persistence`);
 });

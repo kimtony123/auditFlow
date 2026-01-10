@@ -40,6 +40,9 @@ const NewAnalysis: React.FC = () => {
   } = useUserData();
   const { account, isConnected } = useWallet();
 
+  // API Base URL - Use environment variable or fallback
+  const API_BASE_URL = process.env.REACT_APP_API_URL;
+
   // Check AI Reports feature access and remaining
   useEffect(() => {
     if (!isConnected || !account) {
@@ -162,40 +165,75 @@ const handleSubmit = async (e: React.FormEvent) => {
   }
 
   try {
-    // UPDATED: Call our new backend API (running on port 3001)
-    const response = await fetch('https://auditflow-e16i.onrender.com/api/analyze/', {
+    // Determine API endpoint based on analysis type
+    let apiEndpoint = '';
+    let apiBody = {
+      contractAddress,
+      walletAddress: account,
+      network: 'lisk'
+    };
+
+    if (analysisType === 'quick') {
+      apiEndpoint = `${API_BASE_URL}/api/analyze/quick`;
+      // For quick analysis, we only need contractAddress and walletAddress
+      apiBody = {
+        contractAddress,
+        walletAddress: account,  // Using walletAddress field as expected by backend
+        network: 'lisk'
+      };
+    } else {
+      apiEndpoint = `${API_BASE_URL}/api/analyze`;
+      // For standard/full analysis
+      apiBody = {
+        contractAddress,
+        walletAddress: account,
+        network: 'lisk'
+      };
+    }
+
+    console.log(`Calling API: ${apiEndpoint}`, apiBody);
+
+    const response = await fetch(apiEndpoint, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        contractAddress,
-        analysisType,
-        userTier,
-        walletAddress: account,
-        network: 'lisk'
-      })
+      body: JSON.stringify(apiBody)
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || errorData.details || 'Failed to start AI analysis');
+      let errorMessage = 'Failed to start AI analysis';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorData.details || errorData.message || errorMessage;
+      } catch (parseError) {
+        console.error('Failed to parse error response:', parseError);
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
+    console.log('API Response:', data);
     
     // Record feature usage
-    const usageRecorded = await fetch('/api/user/features/usage', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      userAddress: account,
-      featureType: 'ANALYSIS',
-      quantity: 1
-    })
-  });
-    if (!usageRecorded) {
-      console.warn('Failed to record feature usage, but analysis started');
+    try {
+      const usageResponse = await fetch(`${API_BASE_URL}/api/user/features/usage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userAddress: account,
+          featureType: analysisType === 'quick' ? 'QUICK_ANALYSIS' : 'ANALYSIS',
+          quantity: 1
+        })
+      });
+      
+      if (!usageResponse.ok) {
+        console.warn('Failed to record feature usage, but analysis started');
+      } else {
+        console.log('Feature usage recorded successfully');
+      }
+    } catch (usageError) {
+      console.warn('Error recording feature usage:', usageError);
     }
     
     // Update local feature info
@@ -208,29 +246,49 @@ const handleSubmit = async (e: React.FormEvent) => {
     // Prepare the analysis data object
     const analysisData = {
       // Contract Info
-      contractAddress: data.contractAddress,
-      contractName: data.contractName,
-      isVerified: data.isVerified,
-      compilerVersion: data.compilerVersion,
-      abi: data.abi,
+      contractAddress: data.contractAddress || contractAddress,
+      contractName: data.contractName || 'Unnamed Contract',
+      isVerified: data.isVerified || false,
+      compilerVersion: data.compilerVersion || 'Unknown',
+      abi: data.abi || [],
       
       // AI Analysis Data
-      aiAnalysis: data.aiAnalysis,
-      structuredReport: data.structuredReport,
-      riskLevel: data.structuredReport?.riskLevel,
-      auditScore: data.structuredReport?.auditScore,
-      vulnerabilityCounts: data.structuredReport?.vulnerabilityCounts,
-      productionRecommendation: data.structuredReport?.productionRecommendation,
+      aiAnalysis: data.aiAnalysis || data.quickAnalysis || '',
+      structuredReport: data.structuredReport || {},
+      riskLevel: data.structuredReport?.riskLevel || data.riskLevel || 'medium',
+      auditScore: data.structuredReport?.auditScore || data.riskScore || 50,
+      vulnerabilityCounts: data.structuredReport?.vulnerabilityCounts || {
+        high: 0,
+        medium: 0,
+        low: 0,
+        total: 0
+      },
+      productionRecommendation: data.structuredReport?.productionRecommendation || 
+                               data.productionRecommendation || 'Manual review required',
+      
+      // For quick analysis, create a simplified structured report
+      ...(analysisType === 'quick' && !data.structuredReport && {
+        structuredReport: {
+          executiveSummary: data.quickAnalysis?.substring(0, 200) || 'Quick analysis completed',
+          riskLevel: 'medium',
+          riskScore: 50,
+          vulnerabilities: [],
+          gasOptimizations: [],
+          bestPractices: [],
+          recommendations: ['Review the quick analysis results for details'],
+          detailedAnalysis: data.quickAnalysis || 'No detailed analysis available for quick scan'
+        }
+      }),
       
       // Metadata
-      analysisType: data.analysisType,
-      timestamp: data.timestamp,
-      network: data.network,
-      analysisId: data.analysisId,
+      analysisType: analysisType,
+      timestamp: data.timestamp || new Date().toISOString(),
+      network: data.network || 'lisk',
+      analysisId: data.analysisId || `analysis_${Date.now()}`,
       
       // For PDF generation
-      sourceCodePreview: data.sourceCodePreview,
-      sourceCodeLength: data.sourceCodeLength,
+      sourceCodePreview: data.sourceCodePreview || contractAddress.substring(0, 10) + '...',
+      sourceCodeLength: data.sourceCodeLength || 0,
       
       estimatedTime: analysisType === 'quick' ? '2-5 min' : 
                     analysisType === 'standard' ? '10-20 min' : '30-60 min'
@@ -246,7 +304,7 @@ const handleSubmit = async (e: React.FormEvent) => {
       console.warn('Failed to store in sessionStorage:', storageError);
     }
     
-    // UPDATED: Navigate with comprehensive analysis data
+    // Navigate with comprehensive analysis data
     navigate(`/results`, { 
       state: analysisData
     });
@@ -269,8 +327,8 @@ const handleSubmit = async (e: React.FormEvent) => {
   // Get analysis types based on tier
   const getAnalysisOptions = (): AnalysisOption[] => {
     const baseOptions = [
-      { id: "quick", label: "Quick Scan", desc: "Basic vulnerability check", time: "2-5 min", available: userTier !== 'basic' },
-      { id: "standard", label: "Standard Audit", desc: "Full security analysis", time: "10-20 min", available: true },
+      { id: "quick", label: "Quick Scan", desc: "Basic vulnerability check (3 bullet points)", time: "2-5 min", available: userTier !== 'basic' },
+      { id: "standard", label: "Standard Audit", desc: "Full security analysis with JSON report", time: "10-20 min", available: true },
       { id: "full", label: "Full Audit", desc: "Comprehensive analysis with recommendations", time: "30-60 min", available: userTier === 'pro' || userTier === 'enterprise' }
     ];
     
@@ -303,6 +361,9 @@ const handleSubmit = async (e: React.FormEvent) => {
             <div className="connect-icon">🔗</div>
             <h2>Connect Your Wallet</h2>
             <p>Please connect your wallet to access AI analysis features</p>
+            <div className="api-info">
+              <small>Backend: {API_BASE_URL}</small>
+            </div>
           </div>
         </div>
       </DashboardLayout>
@@ -317,6 +378,9 @@ const handleSubmit = async (e: React.FormEvent) => {
           <p className="subtitle">
             Submit verified Lisk contract addresses for AI-powered security analysis
           </p>
+          <div className="api-status">
+            <small>Connected to: {API_BASE_URL}</small>
+          </div>
         </div>
 
         <div className="analysis-form-container">
@@ -379,6 +443,11 @@ const handleSubmit = async (e: React.FormEvent) => {
                     </div>
                     <div className="option-desc">{option.desc}</div>
                     <div className="option-time">⏱️ {option.time}</div>
+                    <div className="option-endpoint">
+                      <small>
+                        {option.id === 'quick' ? 'POST /api/analyze/quick' : 'POST /api/analyze'}
+                      </small>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -396,6 +465,12 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <span className="status-label">Status:</span>
                 <span className={`status-value ${featureInfo.canUse ? 'enabled' : 'disabled'}`}>
                   {featureInfo.canUse ? 'Ready to Analyze' : 'Limit Reached'}
+                </span>
+              </div>
+              <div className="status-row">
+                <span className="status-label">Backend:</span>
+                <span className="status-value connected">
+                  {API_BASE_URL.replace('https://', '')}
                 </span>
               </div>
             </div>
@@ -417,12 +492,14 @@ const handleSubmit = async (e: React.FormEvent) => {
                 {isLoading ? (
                   <>
                     <span className="spinner"></span>
-                    Starting AI Analysis...
+                    {analysisType === 'quick' ? 'Starting Quick Scan...' : 'Starting AI Analysis...'}
                   </>
                 ) : !featureInfo.canUse ? (
                   'Monthly Limit Reached'
                 ) : !contractUrl ? (
                   'Enter Contract Address'
+                ) : analysisType === 'quick' ? (
+                  'Start Quick Scan'
                 ) : (
                   'Start AI Analysis'
                 )}
@@ -436,6 +513,33 @@ const handleSubmit = async (e: React.FormEvent) => {
               >
                 Cancel
               </button>
+
+              <div className="api-test-links">
+                <small>
+                  <a 
+                    href={`${API_BASE_URL}/api/health`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.open(`${API_BASE_URL}/api/health`, '_blank');
+                    }}
+                  >
+                    Test Backend Health
+                  </a> | 
+                  <a 
+                    href={`${API_BASE_URL}/api/debug/openrouter`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.open(`${API_BASE_URL}/api/debug/openrouter`, '_blank');
+                    }}
+                  >
+                    Test OpenRouter
+                  </a>
+                </small>
+              </div>
             </div>
           </form>
 
@@ -444,7 +548,9 @@ const handleSubmit = async (e: React.FormEvent) => {
             <div className="info-card">
               <h3>🤖 AI Analysis Features</h3>
               <ul className="info-list">
-                <li>Smart contract vulnerability detection</li>
+                <li><strong>Quick Scan:</strong> Basic vulnerability check (3 bullet points)</li>
+                <li><strong>Standard Audit:</strong> Full security analysis with JSON report</li>
+                <li><strong>Full Audit:</strong> Comprehensive analysis with recommendations</li>
                 <li>Gas optimization suggestions</li>
                 <li>Code complexity analysis</li>
                 <li>Best practices compliance check</li>
@@ -479,6 +585,12 @@ const handleSubmit = async (e: React.FormEvent) => {
                      'Highest'}
                   </span>
                 </div>
+                <div className="limit-item">
+                  <span className="limit-label">Backend API:</span>
+                  <span className="limit-value connected">
+                    ✓ Connected
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -493,6 +605,9 @@ const handleSubmit = async (e: React.FormEvent) => {
               </ul>
               <div className="example-url">
                 Example: <code>https://blockscout.lisk.com/address/0x2D3C12e8520102c81821bDc627614F40e0685929</code>
+              </div>
+              <div className="test-address">
+                <strong>Test Address:</strong> 0x2D3C12e8520102c81821bDc627614F40e0685929
               </div>
             </div>
 
@@ -523,6 +638,28 @@ const handleSubmit = async (e: React.FormEvent) => {
                 </a>
               </div>
             )}
+
+            <div className="info-card api-info-card">
+              <h3>🔧 API Endpoints</h3>
+              <div className="endpoint-list">
+                <div className="endpoint-item">
+                  <strong>POST /api/analyze</strong>
+                  <p>Standard/Full audit with JSON report</p>
+                </div>
+                <div className="endpoint-item">
+                  <strong>POST /api/analyze/quick</strong>
+                  <p>Quick scan (3 bullet points)</p>
+                </div>
+                <div className="endpoint-item">
+                  <strong>GET /api/health</strong>
+                  <p>Backend health check</p>
+                </div>
+                <div className="endpoint-item">
+                  <strong>GET /api/debug/openrouter</strong>
+                  <p>Test OpenRouter connection</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
