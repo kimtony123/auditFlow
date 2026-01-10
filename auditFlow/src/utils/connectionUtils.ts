@@ -18,9 +18,6 @@ export const LISK_SEPOLIA = {
 } as const;
 
 export const TOKEN_ADDRESS = '0xD2B7c81739F1E95be91dA584f20139BCA7E40aE5';
-
-
-
 export const STAKING_ADDRESS = '0xD2B7c81739F1E95be91dA584f20139BCA7E40aE5';
 
 // ============================
@@ -40,6 +37,14 @@ declare global {
     ethereum?: EthereumProvider;
   }
 }
+
+// ============================
+// HELPER FUNCTIONS
+// ============================
+
+const normalizeChainId = (chainId: string): string => {
+  return chainId.toLowerCase().replace('0x', '');
+};
 
 // ============================
 // CORE FUNCTIONS
@@ -77,7 +82,6 @@ export const connectWallet = async (): Promise<string | null> => {
   }
 
   try {
-    // Request account access
     const accounts = await window.ethereum.request({ 
       method: 'eth_requestAccounts' 
     });
@@ -101,22 +105,24 @@ export const connectWallet = async (): Promise<string | null> => {
   }
 };
 
+// Update in utils/connectionUtils.ts
 export const disconnectWallet = (): void => {
+  // Clear all wallet-related storage
   localStorage.removeItem('lastConnectedAccount');
+  console.log('Wallet disconnected - all storage cleared');
 };
+
 
 export const switchToLiskSepolia = async (): Promise<boolean> => {
   if (!window.ethereum) return false;
 
   try {
-    // Try to switch to Lisk Sepolia
     await window.ethereum.request({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: LISK_SEPOLIA.chainId }],
     });
     return true;
   } catch (error: any) {
-    // If chain is not added, add it
     if (error.code === 4902) {
       try {
         await window.ethereum.request({
@@ -147,7 +153,11 @@ export const getChainId = async (): Promise<string | null> => {
 
 export const isOnLiskSepolia = async (): Promise<boolean> => {
   const chainId = await getChainId();
-  return chainId === LISK_SEPOLIA.chainId;
+  if (!chainId) return false;
+  
+  // Case-insensitive comparison to handle both "0x106A" and "0x106a"
+  const normalizedChainId = normalizeChainId(chainId);
+  return normalizedChainId === '106a'; // 4202 in hex
 };
 
 export const getSigner = async (): Promise<ethers.JsonRpcSigner | null> => {
@@ -173,10 +183,12 @@ export const setupWalletListeners = (
   if (!window.ethereum) return () => {};
 
   const handleAccountsChanged = (accounts: string[]) => {
+    console.log('Accounts changed:', accounts);
     onAccountsChanged(accounts);
   };
   
   const handleChainChanged = (chainId: string) => {
+    console.log('Chain changed to:', chainId);
     onChainChanged(chainId);
   };
   
@@ -209,6 +221,14 @@ export const getBalance = async (address: string): Promise<string> => {
     console.error('Error getting balance:', error);
     return '0';
   }
+};
+
+// Add this to utils/connectionUtils.ts
+export const clearWalletSession = (): void => {
+  // Clear all wallet-related localStorage items
+  localStorage.removeItem('lastConnectedAccount');
+  // You could add more if needed
+  console.log('Wallet session cleared');
 };
 
 export const createContractInstance = async <T>(address: string, abi: any): Promise<T | null> => {

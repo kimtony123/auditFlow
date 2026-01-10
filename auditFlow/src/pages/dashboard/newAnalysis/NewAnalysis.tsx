@@ -41,7 +41,6 @@ const NewAnalysis: React.FC = () => {
   const { account, isConnected } = useWallet();
 
   // API Base URL - Use environment variable or fallback
-  const API_BASE_URL = process.env.REACT_APP_API_URL;
 
   // Check AI Reports feature access and remaining
   useEffect(() => {
@@ -174,7 +173,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     };
 
     if (analysisType === 'quick') {
-      apiEndpoint = `${API_BASE_URL}/api/analyze/quick`;
+      apiEndpoint = `https://auditflow-ji70.onrender.comapi/analyze/quick`;
       // For quick analysis, we only need contractAddress and walletAddress
       apiBody = {
         contractAddress,
@@ -182,7 +181,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         network: 'lisk'
       };
     } else {
-      apiEndpoint = `${API_BASE_URL}/api/analyze`;
+      apiEndpoint = `https://auditflow-ji70.onrender.com/api/analyze`;
       // For standard/full analysis
       apiBody = {
         contractAddress,
@@ -217,7 +216,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     
     // Record feature usage
     try {
-      const usageResponse = await fetch(`${API_BASE_URL}/api/user/features/usage`, {
+      const usageResponse = await fetch(`https://auditflow-ji70.onrender.com/api/user/features/usage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -362,7 +361,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             <h2>Connect Your Wallet</h2>
             <p>Please connect your wallet to access AI analysis features</p>
             <div className="api-info">
-              <small>Backend: {API_BASE_URL}</small>
+          
             </div>
           </div>
         </div>
@@ -379,7 +378,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             Submit verified Lisk contract addresses for AI-powered security analysis
           </p>
           <div className="api-status">
-            <small>Connected to: {API_BASE_URL}</small>
+            <small>Connected to: https://auditflow-e16i.onrender.com</small>
           </div>
         </div>
 
@@ -470,7 +469,6 @@ const handleSubmit = async (e: React.FormEvent) => {
               <div className="status-row">
                 <span className="status-label">Backend:</span>
                 <span className="status-value connected">
-                  {API_BASE_URL.replace('https://', '')}
                 </span>
               </div>
             </div>
@@ -517,23 +515,23 @@ const handleSubmit = async (e: React.FormEvent) => {
               <div className="api-test-links">
                 <small>
                   <a 
-                    href={`${API_BASE_URL}/api/health`} 
+                    href={`https://auditflow-e16i.onrender.com/api/health`} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     onClick={(e) => {
                       e.preventDefault();
-                      window.open(`${API_BASE_URL}/api/health`, '_blank');
+                      window.open(`https://auditflow-e16i.onrender.com/api/health`, '_blank');
                     }}
                   >
                     Test Backend Health
                   </a> | 
                   <a 
-                    href={`${API_BASE_URL}/api/debug/openrouter`}
+                    href={`https://auditflow-e16i.onrender.com/api/debug/openrouter`}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => {
                       e.preventDefault();
-                      window.open(`${API_BASE_URL}/api/debug/openrouter`, '_blank');
+                      window.open(`https://auditflow-e16i.onrender.com/api/debug/openrouter`, '_blank');
                     }}
                   >
                     Test OpenRouter

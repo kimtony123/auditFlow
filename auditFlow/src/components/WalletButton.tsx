@@ -3,7 +3,6 @@ import { useWallet } from '../services/WalletProvider';
 
 const WalletButton = () => {
   const {
-
     formattedAddress,
     isConnected,
     isOnLisk,
@@ -50,19 +49,33 @@ const WalletButton = () => {
           className="btn btn-warning"
           onClick={switchToLisk}
           disabled={loading}
+          title="Switch to Lisk Sepolia network"
         >
-          ⚠️ Switch to Lisk
+          {loading ? (
+            <>
+              <span className="spinner-small"></span>
+              Switching...
+            </>
+          ) : (
+            '⚠️ Switch to Lisk'
+          )}
         </button>
       )}
       
       <div className="wallet-details">
-        <span className="wallet-address">{formattedAddress}</span>
-        <span className={`network-indicator ${isOnLisk ? 'on-lisk' : 'wrong-network'}`}>
+        <span className="wallet-address" title={formattedAddress || ''}>
+          {formattedAddress}
+        </span>
+        <span 
+          className={`network-indicator ${isOnLisk ? 'on-lisk' : 'wrong-network'}`}
+          title={isOnLisk ? 'Connected to Lisk Sepolia' : 'Please switch to Lisk Sepolia'}
+        >
           {isOnLisk ? '✓ Lisk' : 'Wrong Network'}
         </span>
         <button
           className="btn btn-secondary"
           onClick={disconnect}
+          title="Disconnect wallet"
         >
           Disconnect
         </button>

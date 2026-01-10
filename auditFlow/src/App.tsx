@@ -13,6 +13,7 @@ import { ThemeProvider } from './services/ThemeProvider';
 import { UserDataProvider } from './context/UserDataContext'; // CHANGED IMPORT
 import UserDataFetcher from './components/userdata/UserDataFetcher';
 import AnalysisResults from "./pages/dashboard/analysisResults/AnalysisResults";
+import FoundryTestGenerator from "./pages/dashboard/analysisResults/FoundryTestGenerator";
 
 const App: React.FC = () => {
   return (
@@ -25,10 +26,10 @@ const App: React.FC = () => {
                 <Route path="/" element={<Home />} />
                 <Route path="/dashboard/*" element={<Dashboard />} />
                 <Route path="/aianalysis" element={<AiAnalysis />} />
+
+                <Route path="/foundrytests" element={<FoundryTestGenerator />} />
                 <Route path="/results" element={<AnalysisResults />} />
                 <Route path="/report" element={<CreateReport />} />
-
-
                 <Route path="/stake" element={<Stake />} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/settings" element={<Settings />} />
