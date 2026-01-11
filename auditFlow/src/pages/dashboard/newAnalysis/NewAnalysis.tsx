@@ -168,25 +168,28 @@ const handleSubmit = async (e: React.FormEvent) => {
     let apiEndpoint = '';
     let apiBody = {
       contractAddress,
-      walletAddress: account,
-      network: 'lisk'
+      userAddress: account,
+      network: 'lisk-sepolia',
+      analysisType: analysisType
     };
 
     if (analysisType === 'quick') {
-      apiEndpoint = `https://auditflow-ji70.onrender.comapi/analyze/quick`;
+      apiEndpoint = `https://auditflow-ji70.onrender.com/api/analyze/quick`;
       // For quick analysis, we only need contractAddress and walletAddress
       apiBody = {
         contractAddress,
-        walletAddress: account,  // Using walletAddress field as expected by backend
-        network: 'lisk'
+        userAddress: account,  // Using userAddress field as expected by backend
+        network: 'lisk-sepolia',
+        analysisType : 'quick'
       };
     } else {
       apiEndpoint = `https://auditflow-ji70.onrender.com/api/analyze`;
       // For standard/full analysis
       apiBody = {
         contractAddress,
-        walletAddress: account,
-        network: 'lisk'
+        userAddress: account,
+        network: 'lisk-sepolia',
+        analysisType : analysisType
       };
     }
 
@@ -377,9 +380,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           <p className="subtitle">
             Submit verified Lisk contract addresses for AI-powered security analysis
           </p>
-          <div className="api-status">
-            <small>Connected to: https://auditflow-e16i.onrender.com</small>
-          </div>
+          
         </div>
 
         <div className="analysis-form-container">
@@ -512,32 +513,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 Cancel
               </button>
 
-              <div className="api-test-links">
-                <small>
-                  <a 
-                    href={`https://auditflow-e16i.onrender.com/api/health`} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      window.open(`https://auditflow-e16i.onrender.com/api/health`, '_blank');
-                    }}
-                  >
-                    Test Backend Health
-                  </a> | 
-                  <a 
-                    href={`https://auditflow-e16i.onrender.com/api/debug/openrouter`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      window.open(`https://auditflow-e16i.onrender.com/api/debug/openrouter`, '_blank');
-                    }}
-                  >
-                    Test OpenRouter
-                  </a>
-                </small>
-              </div>
+              
             </div>
           </form>
 

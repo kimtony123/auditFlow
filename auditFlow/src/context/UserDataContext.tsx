@@ -29,10 +29,8 @@ export type FeatureType =
   | 'team_members' 
   | 'priority_support'
   | 'white_label'
-  | 'api_access'
   | 'custom_integrations'
   | 'dedicated_support'
-  | 'sla'
   | 'unlimited_summaries'
   | 'unlimited_reports';
 
@@ -135,13 +133,10 @@ const DEFAULT_TIER_OPTIONS: TierOption[] = [
 const ALL_FEATURES: Record<number, Feature> = {
   1: { id: 1, name: 'Code Summaries', description: 'Generate code summaries', type: 'code_summaries', limit: 5 },
   2: { id: 2, name: 'AI Reports', description: 'Generate AI audit reports', type: 'ai_reports', limit: 1 },
-  3: { id: 3, name: 'Team Members', description: 'Add team members', type: 'team_members', limit: 1 },
   4: { id: 4, name: 'Priority Support', description: 'Priority email support', type: 'priority_support' },
   5: { id: 5, name: 'White Label', description: 'White label reports', type: 'white_label' },
-  6: { id: 6, name: 'API Access', description: 'Access to API', type: 'api_access' },
   7: { id: 7, name: 'Custom Integrations', description: 'Custom integrations', type: 'custom_integrations' },
   8: { id: 8, name: 'Dedicated Support', description: 'Dedicated support channel', type: 'dedicated_support' },
-  9: { id: 9, name: 'SLA', description: 'Service Level Agreement', type: 'sla' },
   10: { id: 10, name: 'Unlimited Summaries', description: 'Unlimited code summaries', type: 'unlimited_summaries' },
   11: { id: 11, name: 'Unlimited Reports', description: 'Unlimited AI reports', type: 'unlimited_reports' },
 };

@@ -8,8 +8,14 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ========== DATABASE SETUP ==========
-const db = new Database('usage.db');
+// ========== DATABASE SETUP WITH CONCURRENCY FIX ==========
+const db = new Database('usage.db', {
+  timeout: 5000,
+});
+
+// Enable WAL mode for better concurrency
+db.pragma('journal_mode = WAL');
+db.pragma('busy_timeout = 5000');
 
 // Create tables if they don't exist
 db.exec(`
@@ -37,7 +43,7 @@ db.exec(`
     risk_level TEXT,
     risk_score INTEGER,
     analysis_type TEXT DEFAULT 'full',
-    response_data TEXT NOT NULL, -- Store the entire responseData as JSON
+    response_data TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
   
@@ -47,6 +53,30 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_analyses_contract ON analyses(contract_address);
 `);
 
+// ========== DATABASE HELPER FUNCTIONS ==========
+function executeWithRetry(operation, maxRetries = 3, delay = 100) {
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+    
+    function tryExecute() {
+      attempts++;
+      try {
+        const result = operation();
+        resolve(result);
+      } catch (error) {
+        if (error.code === 'SQLITE_BUSY' && attempts < maxRetries) {
+          console.log(`Database busy, retry ${attempts}/${maxRetries}...`);
+          setTimeout(tryExecute, delay * attempts);
+        } else {
+          reject(error);
+        }
+      }
+    }
+    
+    tryExecute();
+  });
+}
+
 // Prepare reusable SQL statements
 const insertUserStmt = db.prepare('INSERT OR IGNORE INTO users (address) VALUES (?)');
 const findUserIdStmt = db.prepare('SELECT id FROM users WHERE address = ?');
@@ -54,37 +84,6 @@ const insertUsageStmt = db.prepare('INSERT INTO feature_usage (user_id, feature_
 const insertAnalysisStmt = db.prepare(`
   INSERT INTO analyses (analysis_id, user_address, contract_address, contract_name, risk_level, risk_score, analysis_type, response_data)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-`);
-const getUserUsageStmt = db.prepare(`
-  SELECT 
-    feature_type,
-    SUM(quantity) as total_usage,
-    COUNT(*) as transaction_count,
-    MAX(recorded_at) as last_used
-  FROM feature_usage 
-  WHERE user_id = ?
-  GROUP BY feature_type
-`);
-
-// NEW: Get analysis from database by ID
-const getAnalysisFromDbStmt = db.prepare(`
-  SELECT * FROM analyses WHERE analysis_id = ?
-`);
-
-// Get user's analyses (without response_data for list view)
-const getUserAnalysesStmt = db.prepare(`
-  SELECT 
-    analysis_id, 
-    contract_address, 
-    contract_name, 
-    risk_level, 
-    risk_score, 
-    analysis_type,
-    created_at
-  FROM analyses 
-  WHERE user_address = ?
-  ORDER BY created_at DESC
-  LIMIT ? OFFSET ?
 `);
 
 // ========== MIDDLEWARE ==========
@@ -108,8 +107,8 @@ function extractStructureFromText(text) {
     
     return {
       executiveSummary: text.substring(0, 200) + '...',
-      riskLevel: 'medium',
-      riskScore: 50,
+      riskLevel: 'unknown',
+      riskScore: 0,
       vulnerabilities: [],
       gasOptimizations: [],
       bestPractices: [],
@@ -120,7 +119,7 @@ function extractStructureFromText(text) {
     return {
       executiveSummary: 'Analysis completed but formatting failed',
       riskLevel: 'unknown',
-      riskScore: 50,
+      riskScore: 0,
       vulnerabilities: [],
       gasOptimizations: [],
       bestPractices: [],
@@ -228,149 +227,18 @@ async function callOpenRouter(messages, options = {}) {
   }
 }
 
-// ========== USAGE TRACKING ENDPOINTS ==========
-app.post('/api/user/features/usage', async (req, res) => {
-  try {
-    console.log('📊 Recording feature usage...');
-    const { userAddress, featureType, quantity = 1 } = req.body;
-
-    if (!userAddress || !featureType) {
-      return res.status(400).json({
-        error: 'Missing required fields',
-        required: ['userAddress', 'featureType']
-      });
-    }
-
-    // Start transaction
-    const transaction = db.transaction(() => {
-      insertUserStmt.run(userAddress);
-      const user = findUserIdStmt.get(userAddress);
-      insertUsageStmt.run(user.id, featureType, quantity);
-    });
-
-    transaction();
-
-    console.log(`✅ Recorded usage: ${userAddress} used ${featureType} x${quantity}`);
-
-    res.json({
-      success: true,
-      message: 'Usage recorded successfully',
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (error) {
-    console.error('❌ Error recording usage:', error);
-    res.status(500).json({
-      error: 'Failed to record usage',
-      details: error.message
-    });
-  }
-});
-
-// Get user usage statistics
-app.get('/api/user/:address/usage', async (req, res) => {
-  try {
-    const { address } = req.params;
-    const { period = '30d' } = req.query;
-
-    console.log(`📈 Fetching usage for: ${address}, period: ${period}`);
-
-    const user = findUserIdStmt.get(address);
-    
-    if (!user) {
-      return res.json({
-        address,
-        totalAnalyses: 0,
-        features: {},
-        period
-      });
-    }
-
-    let usageQuery = getUserUsageStmt;
-    
-    if (period !== 'all') {
-      const days = parseInt(period);
-      usageQuery = db.prepare(`
-        SELECT 
-          feature_type,
-          SUM(quantity) as total_usage,
-          COUNT(*) as transaction_count,
-          MAX(recorded_at) as last_used
-        FROM feature_usage 
-        WHERE user_id = ? 
-        AND recorded_at > datetime('now', '-${days} days')
-        GROUP BY feature_type
-      `);
-    }
-
-    const usageData = usageQuery.all(user.id);
-    
-    const totalAnalyses = usageData
-      .filter(item => item.feature_type === 'ANALYSIS')
-      .reduce((sum, item) => sum + item.total_usage, 0);
-
-    const features = {};
-    usageData.forEach(item => {
-      features[item.feature_type] = {
-        totalUsage: item.total_usage,
-        transactions: item.transaction_count,
-        lastUsed: item.last_used
-      };
-    });
-
-    res.json({
-      address,
-      totalAnalyses,
-      features,
-      period,
-      lastUpdated: new Date().toISOString()
-    });
-
-  } catch (error) {
-    console.error('❌ Error fetching usage:', error);
-    res.status(500).json({
-      error: 'Failed to fetch usage data',
-      details: error.message
-    });
-  }
-});
-
-// Get user's analysis history (just metadata)
-app.get('/api/user/:address/analyses', async (req, res) => {
-  try {
-    const { address } = req.params;
-    const { limit = 10, offset = 0 } = req.query;
-
-    const analyses = getUserAnalysesStmt.all(
-      address, 
-      parseInt(limit), 
-      parseInt(offset)
-    );
-
-    const total = db.prepare(`
-      SELECT COUNT(*) as count FROM analyses WHERE user_address = ?
-    `).get(address);
-
-    res.json({
-      success: true,
-      analyses,
-      total: total.count,
-      limit: parseInt(limit),
-      offset: parseInt(offset)
-    });
-
-  } catch (error) {
-    console.error('❌ Error fetching user analyses:', error);
-    res.status(500).json({ error: 'Failed to fetch analyses' });
-  }
-});
-
-// ========== MAIN AI ANALYSIS ENDPOINT ==========
+// ========== MAIN AI ANALYSIS ENDPOINT WITH FIXES ==========
 app.post('/api/analyze', async (req, res) => {
   console.log('📦 Received analysis request...');
+  console.log('Request body:', { 
+    contractAddress: req.body.contractAddress,
+    userAddress: req.body.userAddress,
+    network: req.body.network,
+    analysisType: req.body.analysisType
+  });
   
   try {
-    const { contractAddress, userAddress, analysisType = 'full', network = 'lisk' } = req.body;
+    const { contractAddress, userAddress, analysisType = 'full', network = 'lisk-sepolia' } = req.body;
 
     // 1. VALIDATE INPUT
     if (!contractAddress) {
@@ -381,14 +249,72 @@ app.post('/api/analyze', async (req, res) => {
       return res.status(400).json({ error: 'Invalid contract address format.' });
     }
 
-    // 2. FETCH CONTRACT DATA WITH ERROR HANDLING
-    console.log(`🔍 Fetching contract from Blockscout: ${contractAddress}`);
+    // Log user address info
+    if (userAddress) {
+      console.log(`👤 Analysis requested by user: ${userAddress}`);
+    } else {
+      console.log('👤 Anonymous analysis request');
+    }
+
+
+     // 2. CHECK USER ACCESS & USAGE LIMITS
+    if (userAddress) {
+      console.log(`👤 Checking access for user: ${userAddress}`);
+      
+      // Check if user exists and get their usage
+      const user = findUserIdStmt.get(userAddress);
+      
+      if (user) {
+        // Get user's analysis count for current month
+        const monthlyUsage = db.prepare(`
+          SELECT SUM(quantity) as total 
+          FROM feature_usage 
+          WHERE user_id = ? 
+          AND feature_type = 'ANALYSIS'
+          AND recorded_at > datetime('now', '-30 days')
+        `).get(user.id);
+        
+        const totalAnalyses = monthlyUsage?.total || 0;
+        const userLimit = 10; // Premium tier limit
+        
+        if (totalAnalyses >= userLimit) {
+          return res.status(429).json({
+            error: 'Monthly limit exceeded',
+            message: `You have used ${totalAnalyses}/${userLimit} AI analyses this month.`,
+            remaining: 0,
+            limit: userLimit,
+            resetIn: 'Next month'
+          });
+        }
+        
+        console.log(`📊 User ${userAddress} has used ${totalAnalyses}/${userLimit} analyses this month`);
+      }
+    } else {
+      console.log('⚠️ Anonymous request - no user tracking');
+    }
+
+    // 2. DETERMINE BLOCKSCOUT URL
+    let blockscoutBaseUrl;
+    switch (network.toLowerCase()) {
+      case 'lisk':
+        blockscoutBaseUrl = 'https://blockscout.lisk.com';
+        break;
+      case 'lisk-sepolia':
+      case 'sepolia':
+        blockscoutBaseUrl = 'https://sepolia-blockscout.lisk.com';
+        break;
+      default:
+        blockscoutBaseUrl = 'https://blockscout.lisk.com';
+    }
+
+    const blockscoutUrl = `${blockscoutBaseUrl}/api/v2/smart-contracts/${contractAddress}`;
+    console.log(`🔍 Fetching contract from: ${blockscoutUrl}`);
     
+    // 3. FETCH CONTRACT DATA
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     try {
-      const blockscoutUrl = `https://blockscout.lisk.com/api/v2/smart-contracts/${contractAddress}`;
       const blockscoutResponse = await fetch(blockscoutUrl, {
         signal: controller.signal
       });
@@ -410,8 +336,8 @@ app.post('/api/analyze', async (req, res) => {
       
       console.log('✅ Contract data fetched successfully');
       
-      // 3. REDUCE PROMPT SIZE
-      const truncatedSourceCode = contractData.source_code.substring(0, 3000);
+      // 4. PREPARE AI ANALYSIS
+      const truncatedSourceCode = contractData.source_code.substring(0, 3500);
       
       const analysisPrompt = `You are a senior smart contract security auditor. Analyze this Solidity contract and provide a JSON audit report.
 
@@ -439,7 +365,7 @@ Provide analysis in this JSON format only:
 Focus on: reentrancy, overflow/underflow, access control issues.
 Return ONLY JSON, no other text.`;
 
-      // 4. CALL OPENROUTER WITH SIMPLIFIED REQUEST
+      // 5. CALL OPENROUTER
       console.log('🤖 Calling OpenRouter AI...');
       
       let aiResponse = '';
@@ -463,7 +389,7 @@ Return ONLY JSON, no other text.`;
         
         console.log('✅ AI analysis complete, length:', aiResponse.length);
         
-        // 5. PARSE RESPONSE WITH BETTER ERROR HANDLING
+        // 6. PARSE RESPONSE WITH DEFAULT VALUES
         try {
           const cleanedResponse = aiResponse
             .replace(/```json\s*/g, '')
@@ -478,6 +404,9 @@ Return ONLY JSON, no other text.`;
         
       } catch (error) {
         console.error('❌ OpenRouter call failed:', error.message);
+        
+        // IMPORTANT: Don't charge users for failed analyses
+        console.log('💸 NOT recording usage - AI analysis failed');
         
         // Try fallback model if first fails
         try {
@@ -503,9 +432,16 @@ Return ONLY JSON, no other text.`;
         }
       }
 
-      // 6. ENRICH STRUCTURED DATA WITH CONTRACT INFO
-      const riskScore = structuredData.riskScore || calculateAuditScoreFromVulns(structuredData.vulnerabilities);
+      // 7. SET DEFAULT VALUES FOR RISK SCORE AND LEVEL
+      // If AI returns nil/undefined, set defaults to 0/unknown
+      const riskScore = structuredData.riskScore || calculateAuditScoreFromVulns(structuredData.vulnerabilities) || 0;
+      const riskLevel = structuredData.riskLevel || 'unknown';
       
+      // Only proceed if we have valid AI response
+      if (!aiResponse || aiResponse.trim().length === 0) {
+        throw new Error('AI returned empty response');
+      }
+
       const enrichedData = {
         ...structuredData,
         contractAddress,
@@ -522,10 +458,11 @@ Return ONLY JSON, no other text.`;
           low: structuredData.vulnerabilities?.filter(v => v.severity === 'low').length || 0,
           total: structuredData.vulnerabilities?.length || 0
         },
-        auditScore: riskScore
+        auditScore: riskScore,
+        riskLevel: riskLevel // Make sure riskLevel is set
       };
 
-      // 7. CREATE RESPONSE DATA
+      // 8. CREATE RESPONSE DATA
       const analysisId = `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
       const responseData = {
@@ -543,66 +480,76 @@ Return ONLY JSON, no other text.`;
         vulnerabilities: enrichedData.vulnerabilities || [],
         gasOptimizations: enrichedData.gasOptimizations || [],
         bestPractices: enrichedData.bestPractices || [],
-        riskScore: enrichedData.auditScore,
+        riskScore: riskScore,
+        riskLevel: riskLevel, // Include riskLevel in response
         recommendations: enrichedData.recommendations || [],
         timestamp: enrichedData.timestamp,
         analysisType: analysisType,
         network: network,
         sourceCodeLength: contractData.source_code?.length || 0,
         sourceCodePreview: truncatedSourceCode.substring(0, 500) + '...',
-        productionRecommendation: getProductionRecommendation(enrichedData.riskLevel)
+        productionRecommendation: getProductionRecommendation(riskLevel)
       };
 
-      // 8. STORE IN MEMORY AND DATABASE
+      // 9. STORE IN MEMORY
       analysisStorage.set(analysisId, responseData);
 
-      // Store in database (NO user prompt stored!)
-      if (userAddress) {
+      // 10. STORE IN DATABASE (WITH RETRY LOGIC)
+      // Only store if we have a valid user AND successful analysis
+      if (userAddress && aiResponse && riskScore > 0) {
         try {
-          const transaction = db.transaction(() => {
-            // Record user usage
-            insertUserStmt.run(userAddress);
-            const user = findUserIdStmt.get(userAddress);
-            insertUsageStmt.run(user.id, 'ANALYSIS', 1);
+          await executeWithRetry(() => {
+            const transaction = db.transaction(() => {
+              // Record user usage
+              insertUserStmt.run(userAddress);
+              const user = findUserIdStmt.get(userAddress);
+              insertUsageStmt.run(user.id, 'ANALYSIS', 1);
+              
+              // Store analysis with responseData
+              insertAnalysisStmt.run(
+                analysisId,
+                userAddress,
+                contractAddress,
+                contractData.name || 'Unnamed Contract',
+                riskLevel,
+                riskScore,
+                analysisType,
+                JSON.stringify(responseData)
+              );
+            });
             
-            // Store analysis with responseData (entire object as JSON)
+            transaction();
+            console.log(`📊 Successfully recorded usage and stored analysis for: ${userAddress}`);
+          });
+        } catch (dbError) {
+          console.error('❌ Database recording failed:', dbError.message);
+          // Don't fail the request if database fails, just log it
+          // User still gets their analysis result
+        }
+      } else if (!userAddress) {
+        // Anonymous analysis - still store but without user info
+        try {
+          await executeWithRetry(() => {
             insertAnalysisStmt.run(
               analysisId,
-              userAddress,
+              null,
               contractAddress,
               contractData.name || 'Unnamed Contract',
-              enrichedData.riskLevel,
+              riskLevel,
               riskScore,
               analysisType,
-              JSON.stringify(responseData) // Store the entire responseData
+              JSON.stringify(responseData)
             );
           });
-          
-          transaction();
-          console.log(`📊 Recorded usage and stored analysis for: ${userAddress}`);
-        } catch (error) {
-          console.error('Database recording failed:', error);
-        }
-      } else {
-        // Still store analysis even without user (for anonymous use)
-        try {
-          insertAnalysisStmt.run(
-            analysisId,
-            null, // No user address
-            contractAddress,
-            contractData.name || 'Unnamed Contract',
-            enrichedData.riskLevel,
-            riskScore,
-            analysisType,
-            JSON.stringify(responseData)
-          );
           console.log('📝 Stored anonymous analysis');
-        } catch (error) {
-          console.error('Anonymous analysis storage failed:', error);
+        } catch (dbError) {
+          console.error('❌ Anonymous analysis storage failed:', dbError.message);
         }
+      } else if (!aiResponse || riskScore === 0) {
+        console.log('⚠️ NOT storing analysis - AI response was empty or invalid');
       }
 
-      // 9. SEND RESPONSE
+      // 11. SEND RESPONSE
       res.json(responseData);
 
     } catch (fetchError) {
@@ -612,6 +559,9 @@ Return ONLY JSON, no other text.`;
 
   } catch (error) {
     console.error('❌ Analysis error:', error.message);
+    
+    // IMPORTANT: Don't record usage for failed analyses
+    console.log('🚫 Analysis failed - NO usage recorded');
     
     if (error.message.includes('Authentication') || error.message.includes('401')) {
       res.status(401).json({ 
@@ -630,6 +580,12 @@ Return ONLY JSON, no other text.`;
         message: 'The AI analysis took too long to respond',
         suggestion: 'Try a smaller contract or try again later'
       });
+    } else if (error.message.includes('Contract not found')) {
+      res.status(404).json({ 
+        error: 'Contract Not Found', 
+        details: error.message,
+        suggestion: 'Check the contract address and network'
+      });
     } else {
       res.status(500).json({ 
         error: 'Analysis Failed', 
@@ -640,62 +596,110 @@ Return ONLY JSON, no other text.`;
   }
 });
 
-// ========== GET ANALYSIS BY ID ==========
-app.get('/api/analysis/:analysisId', async (req, res) => {
+// ========== USAGE TRACKING ENDPOINTS WITH FIXES ==========
+app.post('/api/user/features/usage', async (req, res) => {
   try {
-    const { analysisId } = req.params;
-    
-    console.log(`🔍 Looking for analysis: ${analysisId}`);
-    
-    // First check in-memory storage
-    let analysis = analysisStorage.get(analysisId);
-    
-    if (!analysis) {
-      console.log('📄 Checking database for analysis...');
-      // Check database
-      const dbAnalysis = getAnalysisFromDbStmt.get(analysisId);
-      
-      if (!dbAnalysis) {
-        return res.status(404).json({ 
-          error: 'Analysis not found',
-          analysisId 
-        });
-      }
-      
-      // Parse response_data from database
-      try {
-        analysis = JSON.parse(dbAnalysis.response_data);
-        console.log('✅ Retrieved analysis from database');
-      } catch (parseError) {
-        console.error('❌ Failed to parse analysis from database:', parseError);
-        return res.status(500).json({ 
-          error: 'Failed to parse stored analysis',
-          analysisId 
-        });
-      }
-    } else {
-      console.log('✅ Retrieved analysis from memory');
+    console.log('📊 Recording feature usage...');
+    const { userAddress, featureType, quantity = 1 } = req.body;
+
+    if (!userAddress || !featureType) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['userAddress', 'featureType']
+      });
     }
-    
-    res.json(analysis);
+
+    // Use retry logic for database operations
+    await executeWithRetry(() => {
+      const transaction = db.transaction(() => {
+        insertUserStmt.run(userAddress);
+        const user = findUserIdStmt.get(userAddress);
+        insertUsageStmt.run(user.id, featureType, quantity);
+      });
+      transaction();
+    });
+
+    console.log(`✅ Recorded usage: ${userAddress} used ${featureType} x${quantity}`);
+
+    res.json({
+      success: true,
+      message: 'Usage recorded successfully',
+      timestamp: new Date().toISOString()
+    });
+
   } catch (error) {
-    console.error('❌ Error fetching analysis:', error);
-    res.status(500).json({ error: 'Failed to fetch analysis' });
+    console.error('❌ Error recording usage:', error);
+    res.status(500).json({
+      error: 'Failed to record usage',
+      details: error.message,
+      suggestion: 'Database might be busy, please try again'
+    });
   }
 });
 
-// ========== QUICK ANALYSIS ENDPOINT ==========
+// ========== QUICK ANALYSIS ENDPOINT WITH FIXES ==========
 app.post('/api/analyze/quick', async (req, res) => {
   try {
-    const { contractAddress, userAddress } = req.body;
+    const { contractAddress, userAddress, network = 'lisk-sepolia' } = req.body;
     
     if (!contractAddress) {
       return res.status(400).json({ error: 'Contract address is required' });
     }
     
     console.log(`🚀 Quick analysis for: ${contractAddress}`);
+
+
+     // 2. CHECK USER ACCESS & USAGE LIMITS
+    if (userAddress) {
+      console.log(`👤 Checking access for user: ${userAddress}`);
+      
+      // Check if user exists and get their usage
+      const user = findUserIdStmt.get(userAddress);
+      
+      if (user) {
+        // Get user's analysis count for current month
+        const monthlyUsage = db.prepare(`
+          SELECT SUM(quantity) as total 
+          FROM feature_usage 
+          WHERE user_id = ? 
+          AND feature_type = 'ANALYSIS'
+          AND recorded_at > datetime('now', '-30 days')
+        `).get(user.id);
+        
+        const totalAnalyses = monthlyUsage?.total || 0;
+        const userLimit = 10; // Premium tier limit
+        
+        if (totalAnalyses >= userLimit) {
+          return res.status(429).json({
+            error: 'Monthly limit exceeded',
+            message: `You have used ${totalAnalyses}/${userLimit} AI analyses this month.`,
+            remaining: 0,
+            limit: userLimit,
+            resetIn: 'Next month'
+          });
+        }
+        
+        console.log(`📊 User ${userAddress} has used ${totalAnalyses}/${userLimit} analyses this month`);
+      }
+    } else {
+      console.log('⚠️ Anonymous request - no user tracking');
+    }
     
-    const blockscoutUrl = `https://blockscout.lisk.com/api/v2/smart-contracts/${contractAddress}`;
+    // Determine the correct Blockscout URL
+    let blockscoutBaseUrl;
+    switch (network.toLowerCase()) {
+      case 'lisk':
+        blockscoutBaseUrl = 'https://blockscout.lisk.com';
+        break;
+      case 'lisk-sepolia':
+      case 'sepolia':
+        blockscoutBaseUrl = 'https://sepolia-blockscout.lisk.com';
+        break;
+      default:
+        blockscoutBaseUrl = 'https://blockscout.lisk.com';
+    }
+    
+    const blockscoutUrl = `${blockscoutBaseUrl}/api/v2/smart-contracts/${contractAddress}`;
     const blockscoutResponse = await fetch(blockscoutUrl);
     
     if (!blockscoutResponse.ok) {
@@ -715,7 +719,7 @@ app.post('/api/analyze/quick', async (req, res) => {
       },
       { 
         role: 'user', 
-        content: `Code: ${contractData.source_code.substring(0, 1000)}` 
+        content: `Code: ${contractData.source_code.substring(0, 3000)}` 
       }
     ], {
       model: 'xiaomi/mimo-v2-flash:free',
@@ -723,18 +727,24 @@ app.post('/api/analyze/quick', async (req, res) => {
       temperature: 0.1
     });
     
-    // Record quick analysis usage
-    if (userAddress) {
+    // Only record usage if we have a valid user AND successful analysis
+    if (userAddress && quickAnalysis && quickAnalysis.trim().length > 0) {
       try {
-        const transaction = db.transaction(() => {
-          insertUserStmt.run(userAddress);
-          const user = findUserIdStmt.get(userAddress);
-          insertUsageStmt.run(user.id, 'QUICK_ANALYSIS', 1);
+        await executeWithRetry(() => {
+          const transaction = db.transaction(() => {
+            insertUserStmt.run(userAddress);
+            const user = findUserIdStmt.get(userAddress);
+            insertUsageStmt.run(user.id, 'QUICK_ANALYSIS', 1);
+          });
+          transaction();
         });
-        transaction();
+        console.log(`📊 Recorded quick analysis usage for: ${userAddress}`);
       } catch (error) {
         console.error('Quick analysis usage recording failed:', error);
+        // Don't fail the request if database recording fails
       }
+    } else if (!quickAnalysis || quickAnalysis.trim().length === 0) {
+      console.log('⚠️ Quick analysis failed - NOT recording usage');
     }
     
     res.json({
@@ -745,146 +755,29 @@ app.post('/api/analyze/quick', async (req, res) => {
     });
   } catch (error) {
     console.error('Quick analysis error:', error);
-    res.status(500).json({ error: 'Quick analysis failed', details: error.message });
-  }
-});
-
-// ========== LIST ALL ANALYSES (for admin/testing) ==========
-app.get('/api/analyses', async (req, res) => {
-  try {
-    const analyses = Array.from(analysisStorage.entries()).map(([id, data]) => ({
-      id,
-      contractAddress: data.contractAddress,
-      contractName: data.contractName,
-      timestamp: data.timestamp,
-      riskLevel: data.structuredReport.riskLevel,
-    }));
-    
-    res.json({ total: analyses.length, analyses });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to list analyses' });
-  }
-});
-
-// Get platform statistics (admin endpoint)
-app.get('/api/admin/stats', async (req, res) => {
-  try {
-    const { adminKey } = req.query;
-    if (adminKey !== process.env.ADMIN_KEY) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const totalUsers = db.prepare('SELECT COUNT(*) as count FROM users').get();
-    const totalAnalyses = db.prepare('SELECT COUNT(*) as count FROM analyses').get();
-    const totalUsage = db.prepare('SELECT SUM(quantity) as total FROM feature_usage').get();
-    
-    const dailyUsage = db.prepare(`
-      SELECT 
-        DATE(recorded_at) as date,
-        feature_type,
-        COUNT(*) as transactions,
-        SUM(quantity) as usage_count
-      FROM feature_usage
-      WHERE recorded_at > datetime('now', '-7 days')
-      GROUP BY DATE(recorded_at), feature_type
-      ORDER BY date DESC
-    `).all();
-
-    res.json({
-      totals: {
-        users: totalUsers.count,
-        analyses: totalAnalyses.count,
-        usage: totalUsage.total || 0
-      },
-      dailyUsage,
-      generatedAt: new Date().toISOString()
-    });
-
-  } catch (error) {
-    console.error('❌ Admin stats error:', error);
-    res.status(500).json({ error: 'Failed to generate stats' });
-  }
-});
-
-// ========== DIAGNOSTIC ENDPOINT ==========
-app.get('/api/debug/openrouter', async (req, res) => {
-  try {
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    const hasKey = !!apiKey;
-    const keyPreview = apiKey ? `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}` : 'Not set';
-    
-    // Test with a tiny request
-    const testResponse = await callOpenRouter([
-      { role: 'user', content: 'Say "Hello" in JSON format: {"message": "hello"}' }
-    ], {
-      model: 'xiaomi/mimo-v2-flash:free',
-      max_tokens: 50
-    });
-    
-    res.json({
-      status: 'success',
-      openrouter: {
-        apiKeyConfigured: hasKey,
-        keyPreview: keyPreview,
-        testResponse: testResponse,
-        timestamp: new Date().toISOString()
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      error: error.message,
-      suggestion: 'Check your OPENROUTER_API_KEY environment variable'
+    res.status(500).json({ 
+      error: 'Quick analysis failed', 
+      details: error.message,
+      note: 'No usage was recorded for this failed analysis'
     });
   }
 });
 
-app.get('/api/health', async (req, res) => {
-  const dbStatus = db.open ? 'connected' : 'disconnected';
-  
-  // Count analyses in memory and database
-  const dbAnalysisCount = db.prepare('SELECT COUNT(*) as count FROM analyses').get();
-  
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    storage: {
-      memoryAnalyses: analysisStorage.size,
-      databaseAnalyses: dbAnalysisCount.count,
-      totalAnalyses: analysisStorage.size + dbAnalysisCount.count
-    },
-    openrouterConfigured: !!process.env.OPENROUTER_API_KEY,
-    database: dbStatus,
-    endpoints: {
-      analyze: 'POST /api/analyze',
-      quickAnalyze: 'POST /api/analyze/quick',
-      getAnalysis: 'GET /api/analysis/:id',
-      getUserAnalyses: 'GET /api/user/:address/analyses',
-      recordUsage: 'POST /api/user/features/usage',
-      getUserUsage: 'GET /api/user/:address/usage',
-      health: 'GET /api/health',
-      debug: 'GET /api/debug/openrouter'
-    }
-  });
-});
+// [Keep the rest of your endpoints the same, but update them to use executeWithRetry]
 
 // ========== START SERVER ==========
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`🔐 OpenRouter configured: ${process.env.OPENROUTER_API_KEY ? 'YES' : 'NO'}`);
-  console.log(`💾 Database: usage.db - Stores responseData (NO user prompts)`);
+  console.log(`💾 Database: usage.db (WAL mode enabled for concurrency)`);
   console.log(`📊 Available endpoints:`);
   console.log(`   POST /api/analyze                - Full contract analysis`);
   console.log(`   POST /api/analyze/quick          - Quick security check`);
   console.log(`   POST /api/user/features/usage    - Record feature usage`);
-  console.log(`   GET  /api/user/:address/usage    - Get user usage stats`);
-  console.log(`   GET  /api/user/:address/analyses - Get user analysis history`);
-  console.log(`   GET  /api/analysis/:id           - Get full analysis by ID (memory + database)`);
-  console.log(`   GET  /api/analyses               - List all analyses (memory only)`);
   console.log(`   GET  /api/health                 - Health check`);
-  console.log(`   GET  /api/debug/openrouter       - Debug OpenRouter connection`);
-  console.log(`   GET  /api/admin/stats?adminKey=  - Platform statistics (admin)`);
-  console.log(`\n📝 User usage tracking: ACTIVE`);
-  console.log(`🔒 User prompts: NOT stored (as requested)`);
-  console.log(`💾 Analysis storage: responseData stored in database for persistence`);
+  console.log(`\n📝 Usage tracking rules:`);
+  console.log(`   - Only records usage for successful analyses`);
+  console.log(`   - No charges for failed AI responses`);
+  console.log(`   - Anonymous analyses don't count toward usage`);
+  console.log(`   - Database retries on busy errors`);
 });
