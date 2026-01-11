@@ -72,18 +72,18 @@ interface Resources {
 }
 
 interface RektTest {
-  q1: boolean;
-  q2: boolean;
-  q3: boolean;
-  q4: boolean;
-  q5: boolean;
-  q6: boolean;
-  q7: boolean;
-  q8: boolean;
-  q9: boolean;
-  q10: boolean;
-  q11: boolean;
-  q12: boolean;
+  q1?: boolean;
+  q2?: boolean;
+  q3?: boolean;
+  q4?: boolean;
+  q5?: boolean;
+  q6?: boolean;
+  q7?: boolean;
+  q8?: boolean;
+  q9?: boolean;
+  q10?: boolean;
+  q11?: boolean;
+  q12?: boolean;
 }
 
 interface PostDeployment {
@@ -101,9 +101,9 @@ const CreateReport: React.FC = () => {
     code: false,
     protocol: false,
     risks: false,
-    issues: false,
-    audits: false,
-    resources: false,
+    issues: true, // Optional - always true
+    audits: true, // Optional - always true
+    resources: true, // Optional - always true
     rekt: false,
     post: false
   });
@@ -175,20 +175,7 @@ const CreateReport: React.FC = () => {
     articles: ''
   });
 
-  const [rektTest, setRektTest] = useState<RektTest>({
-    q1: false,
-    q2: false,
-    q3: false,
-    q4: false,
-    q5: false,
-    q6: false,
-    q7: false,
-    q8: false,
-    q9: false,
-    q10: false,
-    q11: false,
-    q12: false
-  });
+  const [rektTest, setRektTest] = useState<RektTest>({});
 
   const [postDeployment, setPostDeployment] = useState<PostDeployment>({
     bugBountyProgram: '',
@@ -208,7 +195,7 @@ const CreateReport: React.FC = () => {
     return Object.values(completionStatus).every(status => status);
   };
 
-  // Validate sections
+  // Validate sections - Fixed to properly check completion
   const validateSection = (section: string): boolean => {
     switch(section) {
       case 'basic':
@@ -226,24 +213,29 @@ const CreateReport: React.FC = () => {
         return !!protocolDetails.currentStatus;
       
       case 'risks':
-        return true; // All optional or have defaults
+        // Risks are considered complete by default since they have default values
+        return true;
       
       case 'issues':
-        return true; // Optional
+        // Issues are optional - always considered complete
+        return true;
       
       case 'audits':
-        return true; // Optional
+        // Audits are optional - always considered complete
+        return true;
       
       case 'resources':
-        return true; // Optional
+        // Resources are optional - always considered complete
+        return true;
       
       case 'rekt':
-        return Object.values(rektTest).some(value => value !== undefined);
+        // Consider complete only if all 12 questions have been answered
+        const answeredQuestions = Object.values(rektTest).filter(value => value !== undefined);
+        return answeredQuestions.length === 12;
       
       case 'post':
-        return !!postDeployment.bugBountyProgram || 
-               !!postDeployment.monitoringSolution || 
-               !!postDeployment.incidentResponseTeam;
+        // Post deployment is optional but recommended
+        return true;
       
       default:
         return false;
@@ -252,10 +244,13 @@ const CreateReport: React.FC = () => {
 
   // Update completion status when form changes
   useEffect(() => {
-    const updatedStatus = { ...completionStatus };
-    Object.keys(updatedStatus).forEach(section => {
+    const updatedStatus: Record<string, boolean> = {};
+    
+    const sections = ['basic', 'code', 'protocol', 'risks', 'issues', 'audits', 'resources', 'rekt', 'post'];
+    sections.forEach(section => {
       updatedStatus[section] = validateSection(section);
     });
+    
     setCompletionStatus(updatedStatus);
   }, [basicInfo, codeDetails, protocolDetails, protocolRisks, knownIssues, previousAudits, resources, rektTest, postDeployment]);
 
@@ -312,7 +307,7 @@ const CreateReport: React.FC = () => {
 
   const handleGeneratePDF = async () => {
     if (!isAllCompleted()) {
-      alert("Please complete all sections before generating PDF");
+      alert("Please complete all required sections before generating PDF");
       return;
     }
     
@@ -366,9 +361,14 @@ const CreateReport: React.FC = () => {
     // Can always go back
     if (tabIndex < currentTabIndex) return true;
     
-    // Can only go forward if all previous tabs are completed
+    // For optional sections, always allow navigation
+    if (['issues', 'audits', 'resources', 'export'].includes(tabId)) return true;
+    
+    // Can only go forward if all previous required tabs are completed
+    const requiredTabs = ['basic', 'code', 'protocol', 'rekt'];
     for (let i = 0; i < tabIndex; i++) {
-      if (!completionStatus[tabs[i].id]) return false;
+      const tab = tabs[i];
+      if (requiredTabs.includes(tab.id) && !completionStatus[tab.id]) return false;
     }
     
     return true;
@@ -378,8 +378,9 @@ const CreateReport: React.FC = () => {
     if (canNavigateToTab(tabId)) {
       setActiveTab(tabId);
     } else {
-      // Find first incomplete tab
-      const firstIncomplete = tabs.find(tab => !completionStatus[tab.id] && tab.id !== 'export');
+      // Find first incomplete required tab
+      const requiredTabs = ['basic', 'code', 'protocol', 'rekt'];
+      const firstIncomplete = tabs.find(tab => requiredTabs.includes(tab.id) && !completionStatus[tab.id]);
       if (firstIncomplete) {
         setActiveTab(firstIncomplete.id);
         alert(`Please complete "${firstIncomplete.label}" section first`);
@@ -438,22 +439,24 @@ const CreateReport: React.FC = () => {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="report-tabs">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              className={`tab ${activeTab === tab.id ? 'active' : ''} ${
-                !canNavigateToTab(tab.id) ? 'disabled' : ''
-              } ${completionStatus[tab.id] ? 'completed' : ''}`}
-              onClick={() => handleTabClick(tab.id)}
-              disabled={!canNavigateToTab(tab.id)}
-            >
-              {tab.icon} {tab.label}
-              {tab.id !== 'export' && completionStatus[tab.id] && (
-                <span className="tab-check">✅</span>
-              )}
-            </button>
-          ))}
+        <div className="report-tabs-container">
+          <div className="report-tabs">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                className={`tab ${activeTab === tab.id ? 'active' : ''} ${
+                  !canNavigateToTab(tab.id) ? 'disabled' : ''
+                } ${completionStatus[tab.id] ? 'completed' : ''}`}
+                onClick={() => handleTabClick(tab.id)}
+                disabled={!canNavigateToTab(tab.id)}
+              >
+                {tab.icon} <span className="tab-label">{tab.label}</span>
+                {tab.id !== 'export' && completionStatus[tab.id] && (
+                  <span className="tab-check">✅</span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Tab Content */}
@@ -1076,7 +1079,10 @@ const CreateReport: React.FC = () => {
               <div className="section-header">
                 <h2>🛡️ The Rekt Test</h2>
                 <p className="section-description">
-                  Security assessment questions
+                  Security assessment questions. Please answer all 12 questions.
+                </p>
+                <p className="section-hint">
+                  <strong>Progress:</strong> {Object.values(rektTest).filter(v => v !== undefined).length}/12 questions answered
                 </p>
               </div>
               
@@ -1094,33 +1100,39 @@ const CreateReport: React.FC = () => {
                   'Do you use the best automated tools to discover security issues in your code?',
                   'Do you undergo external audits and maintain a vulnerability disclosure or bug bounty program?',
                   'Have you considered and mitigated avenues for abusing users of your system?'
-                ].map((question, index) => (
-                  <div key={index} className="rekt-question">
-                    <div className="question-text">
-                      {index + 1}. {question}
+                ].map((question, index) => {
+                  const questionKey = `q${index + 1}` as keyof RektTest;
+                  const isAnswered = rektTest[questionKey] !== undefined;
+                  
+                  return (
+                    <div key={index} className={`rekt-question ${isAnswered ? 'answered' : 'unanswered'}`}>
+                      <div className="question-text">
+                        {index + 1}. {question}
+                      </div>
+                      <div className="question-options">
+                        <label className="radio-label">
+                          <input
+                            type="radio"
+                            name={`rekt-q${index + 1}`}
+                            checked={rektTest[questionKey] === true}
+                            onChange={() => handleRektTestChange(questionKey, true)}
+                          />
+                          Yes
+                        </label>
+                        <label className="radio-label">
+                          <input
+                            type="radio"
+                            name={`rekt-q${index + 1}`}
+                            checked={rektTest[questionKey] === false}
+                            onChange={() => handleRektTestChange(questionKey, false)}
+                          />
+                          No
+                        </label>
+                      </div>
+                      {!isAnswered && <div className="question-hint">Please select Yes or No</div>}
                     </div>
-                    <div className="question-options">
-                      <label className="radio-label">
-                        <input
-                          type="radio"
-                          name={`rekt-q${index + 1}`}
-                          checked={rektTest[`q${index + 1}` as keyof RektTest] === true}
-                          onChange={() => handleRektTestChange(`q${index + 1}` as keyof RektTest, true)}
-                        />
-                        Yes
-                      </label>
-                      <label className="radio-label">
-                        <input
-                          type="radio"
-                          name={`rekt-q${index + 1}`}
-                          checked={rektTest[`q${index + 1}` as keyof RektTest] === false}
-                          onChange={() => handleRektTestChange(`q${index + 1}` as keyof RektTest, false)}
-                        />
-                        No
-                      </label>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1131,7 +1143,7 @@ const CreateReport: React.FC = () => {
               <div className="section-header">
                 <h2>🚀 Post Deployment Planning</h2>
                 <p className="section-description">
-                  Your plans for after deployment
+                  Your plans for after deployment (optional but recommended)
                 </p>
               </div>
               
@@ -1207,11 +1219,11 @@ const CreateReport: React.FC = () => {
                 <div className="completion-check">
                   {isAllCompleted() ? (
                     <div className="completion-success">
-                      ✅ All sections completed! Ready to generate PDF.
+                      ✅ All required sections completed! Ready to generate PDF.
                     </div>
                   ) : (
                     <div className="completion-warning">
-                      ⚠️ Complete all sections before generating PDF ({calculateCompletion()}% complete)
+                      ⚠️ Complete all required sections before generating PDF ({calculateCompletion()}% complete)
                     </div>
                   )}
                 </div>
@@ -1242,7 +1254,7 @@ const CreateReport: React.FC = () => {
                 
                 <div className="export-note">
                   <p>The PDF will include all completed sections with professional formatting suitable for audit teams.</p>
-                  <p className="small">Note: You must complete all sections (100%) before generating the PDF.</p>
+                  <p className="small">Note: Optional sections (Known Issues, Previous Audits, Resources) are not required for PDF generation.</p>
                 </div>
               </div>
             </div>
@@ -1266,10 +1278,10 @@ const CreateReport: React.FC = () => {
               <button
                 type="button"
                 onClick={handleNextTab}
-                disabled={!completionStatus[activeTab]}
-                className={`nav-button next ${!completionStatus[activeTab] ? 'disabled' : ''}`}
+                disabled={!completionStatus[activeTab] && ['basic', 'code', 'protocol', 'rekt'].includes(activeTab)}
+                className={`nav-button next ${(!completionStatus[activeTab] && ['basic', 'code', 'protocol', 'rekt'].includes(activeTab)) ? 'disabled' : ''}`}
               >
-                {completionStatus[activeTab] ? 'Next →' : 'Complete Current Section First'}
+                {completionStatus[activeTab] || !['basic', 'code', 'protocol', 'rekt'].includes(activeTab) ? 'Next →' : 'Complete This Section First'}
               </button>
             )}
           </div>
